@@ -3,7 +3,7 @@ use std::future::IntoFuture;
 async fn spawn_app() -> String {
     let listener = tokio::net::TcpListener::bind("0.0.0.0:0").await.unwrap();
     let port = listener.local_addr().unwrap().port();
-    let server = axum_newsletter::run(listener);
+    let server = axum_newsletter::startup::run(listener);
     tokio::spawn(server.into_future());
     format!("http://127.0.0.1:{}", port)
 }
@@ -39,13 +39,13 @@ async fn subscribe_returns_200_for_valid_form() {
     assert_eq!(200, response.status().as_u16());
 }
 #[tokio::test]
-async fn subscribe_returns_400_when_data_is_missing() {
+async fn subscribe_returns_422_when_data_is_missing() {
     let address = spawn_app().await;
     let client = reqwest::Client::new();
 
     let test_cases = vec![
-        ("email=gabriel.masarin.aguiar%40gmail.com", "missing name"),
         ("name=Gabriel%20Aguiar", "missing email"),
+        ("email=gabriel.masarin.aguiar%40gmail.com", "missing name"),
         ("", "missing both"),
     ];
 
@@ -59,9 +59,9 @@ async fn subscribe_returns_400_when_data_is_missing() {
             .expect("Failed to execute request.");
 
         assert_eq!(
-            400,
+            422,
             response.status().as_u16(),
-            "The API did not fail with 400 Bad Request when the payload was {}",
+            "The API did not fail with 422 Bad Request when the payload was {}",
             message
         );
     }

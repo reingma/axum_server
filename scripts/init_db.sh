@@ -6,10 +6,14 @@ if ! [ -x "$(command -v psql)" ]; then
     echo >&2 "Error: psql is not installed."
     exit 1
 fi
-if ! [ -x "$(command -v sqlx)" ]; then
-    echo >&2 "Error: sqlx is not installed."
+if [ -x "$(ldconfig -p | grep -c libpq)" ]; then
+    echo >&2 "Error: libpq is not installed."
+    exit 1
+fi
+if ! [ -x "$(command -v diesel)" ]; then
+    echo >&2 "Error: diesel is not installed."
     echo >&2 "Use:"
-    echo >&2 "  cargo install sqlx"
+    echo >&2 "  cargo install diesel --no-default-features --features postgres"
     echo >&2 "to install it."
     exit 1
 fi
@@ -40,6 +44,6 @@ done
 
 DATABASE_URL=postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}
 export DATABASE_URL
-sqlx database create
-sqlx migrate run
+diesel setup
+diesel migration run
 >&2 echo "Postgres has been migrated, ready to go."
