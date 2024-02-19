@@ -1,6 +1,9 @@
-use axum_newsletter::run;
+use axum_newsletter::{configuration::get_configuration, startup::run};
 #[tokio::main]
 async fn main() -> Result<(), std::io::Error> {
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:8000").await?;
+    let configuration =
+        get_configuration().expect("Could not read configuration file");
+    let address = format!("127.0.0.1:{}", configuration.application_port);
+    let listener = tokio::net::TcpListener::bind(address).await?;
     run(listener).await
 }

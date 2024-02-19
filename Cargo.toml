@@ -10,5 +10,9 @@ path = "src/lib.rs"
 
 [dependencies]
 axum = "0.7.4"
+config = "0.14.0"
+diesel = "2.1.4"
+diesel-async = { version = "0.4.1", features = ["postgres"] }
 reqwest = "0.11.24"
+serde = { version = "1.0.196", features = ["derive"] }
 tokio = { version = "1.35.1", features = ["macros", "rt-multi-thread"] }
