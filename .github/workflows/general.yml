@@ -4,8 +4,7 @@ on: [push,pull_request]
 
 env:
   CARGO_TERM_COLOR: always
-  SQLX_VERSION: 0.7.1
-  SQLX_FEATURES: "rustls,postgres"
+  DIESEL_VERSION: 2.1.4 
 
 jobs:
   test:
@@ -28,16 +27,14 @@ jobs:
       - name: Rust cache action
         uses: Swatinem/rust-cache@v2
         with:
-          key: sqlx-${{ env.SQLX_VERSION }}
-      - name: Install sqlx-cli
+          key: diesel-${{ env.DIESEL_VERSION }}
+      - name: Install diesel_cli
         run:
-          cargo install sqlx-cli
-          --version=${{ env.SQLX_VERSION }}
-          --features ${{ env.SQLX_FEATURES }}
-          --no-default-features
-          --locked
+          cargo install diesel_cli
       - name: Install psql
         run: sudo apt-get update && sudo apt-get install postgresql-client -y
+      - name: Install libpq-dev
+        run: sudo apt-get update && sudo apt-get install libpq-dev
       - name: Add the linker
         uses: rui314/setup-mold@v1
       - name: Migrate db
@@ -78,16 +75,14 @@ jobs:
       - name: Rust cache action
         uses: Swatinem/rust-cache@v2
         with:
-          key: sqlx-${{ env.SQLX_VERSION }}
-      - name: Install sqlx-cli
+          key: diesel-${{ env.DIESEL_VERSION }}
+      - name: Install diesel_cli
         run:
-          cargo install sqlx-cli
-          --version=${{ env.SQLX_VERSION }}
-          --features ${{ env.SQLX_FEATURES }}
-          --no-default-features
-          --locked
+          cargo install diesel_cli
       - name: Install psql
         run: sudo apt-get update && sudo apt-get install postgresql-client -y
+      - name: Install libpq-dev
+        run: sudo apt-get update && sudo apt-get install libpq-dev
       - name: Add the linker
         uses: rui314/setup-mold@v1
       - name: Migrate db
@@ -115,16 +110,14 @@ jobs:
       - name: Rust cache action
         uses: Swatinem/rust-cache@v2
         with:
-          key: sqlx-${{ env.SQLX_VERSION }}
-      - name: Install sqlx-cli
+          key: diesel-${{ env.DIESEL_VERSION }}
+      - name: Install diesel_cli
         run:
-          cargo install sqlx-cli
-          --version=${{ env.SQLX_VERSION }}
-          --features ${{ env.SQLX_FEATURES }}
-          --no-default-features
-          --locked
+          cargo install diesel_cli
       - name: Install psql
         run: sudo apt-get update && sudo apt-get install postgresql-client -y
+      - name: Install libpq-dev
+        run: sudo apt-get update && sudo apt-get install libpq-dev
       - name: Add the linker
         uses: rui314/setup-mold@v1
       - name: Migrate db
