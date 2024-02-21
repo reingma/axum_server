@@ -1,12 +1,19 @@
-use std::future::IntoFuture;
-
 use axum_newsletter::configuration::get_configuration;
+use axum_newsletter::configuration::DatabaseSettings;
 use axum_newsletter::models::Subscriptions;
 use diesel::prelude::*;
 use diesel::SelectableHelper;
+use diesel_async::async_connection_wrapper::AsyncConnectionWrapper;
 use diesel_async::pooled_connection::deadpool::Pool;
 use diesel_async::pooled_connection::AsyncDieselConnectionManager;
+use diesel_async::AsyncConnection;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
+use diesel_migrations::embed_migrations;
+use diesel_migrations::EmbeddedMigrations;
+use diesel_migrations::MigrationHarness;
+use std::future::IntoFuture;
+
+const MIGRATION: EmbeddedMigrations = embed_migrations!();
 
 pub struct TestApp {
     pub address: String,
@@ -15,8 +22,24 @@ pub struct TestApp {
 async fn spawn_app() -> TestApp {
     let listener = tokio::net::TcpListener::bind("0.0.0.0:0").await.unwrap();
     let port = listener.local_addr().unwrap().port();
-    let configuration =
+    let mut configuration =
         get_configuration().expect("failed to get configuration");
+    configuration.database.database_name = uuid::Uuid::now_v7().to_string();
+
+    configure_database(&configuration.database).await;
+    let conn_string = configuration.database.connection_string().clone();
+    tokio::task::spawn_blocking(move || {
+        let mut db_conn: AsyncConnectionWrapper<AsyncPgConnection> =
+            AsyncConnectionWrapper::<AsyncPgConnection>::establish(
+                &conn_string,
+            )
+            .expect("Error");
+        tokio::task::block_in_place(move || {
+            db_conn.run_pending_migrations(MIGRATION).unwrap();
+        })
+    })
+    .await
+    .expect("thread panic");
     let pool_manager = AsyncDieselConnectionManager::<AsyncPgConnection>::new(
         configuration.database.connection_string(),
     );
@@ -30,6 +53,22 @@ async fn spawn_app() -> TestApp {
         address: format!("http://127.0.0.1:{}", port),
         pool,
     }
+}
+
+async fn configure_database(db_settings: &DatabaseSettings) {
+    let mut db_conn = AsyncPgConnection::establish(
+        &db_settings.connection_string_without_database(),
+    )
+    .await
+    .expect("Failed to connect");
+    let query = diesel::sql_query(format!(
+        r#"CREATE DATABASE "{}";"#,
+        db_settings.database_name
+    ));
+    query
+        .execute(&mut db_conn)
+        .await
+        .expect("Failed to create database");
 }
 
 #[tokio::test]
