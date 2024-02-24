@@ -8,10 +8,13 @@ use diesel_async::{
 use secrecy::ExposeSecret;
 #[tokio::main]
 async fn main() -> Result<(), std::io::Error> {
-    setup_tracing("info", std::io::stdout);
+    setup_tracing("axum_newsletter", "info", std::io::stdout);
     let configuration =
         get_configuration().expect("Could not read configuration file");
-    let address = format!("127.0.0.1:{}", configuration.application_port);
+    let address = format!(
+        "{}:{}",
+        configuration.application.host, configuration.application.port
+    );
     let listener = tokio::net::TcpListener::bind(address).await?;
     tracing::info!(
         "Server started listening on port {}",

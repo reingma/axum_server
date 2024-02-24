@@ -5,6 +5,8 @@ authors = ["Gabriel Aguiar <gabriel.masarin.aguiar@gmail.com>"]
 edition = "2021"
 [lib]
 path = "src/lib.rs"
+[profile.release]
+strip = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

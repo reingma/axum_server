@@ -21,9 +21,9 @@ const MIGRATION: EmbeddedMigrations = embed_migrations!();
 static TRACING: Lazy<()> = Lazy::new(|| {
     let default_filter = "debug";
     if std::env::var("TEST_LOG").is_ok() {
-        setup_tracing(default_filter, std::io::stdout);
+        setup_tracing("test", default_filter, std::io::stdout);
     } else {
-        setup_tracing(default_filter, std::io::sink);
+        setup_tracing("test", default_filter, std::io::sink);
     }
 });
 

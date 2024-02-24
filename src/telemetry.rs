@@ -3,7 +3,7 @@ use tracing_subscriber::fmt::MakeWriter;
 use tracing_subscriber::{
     layer::SubscriberExt, util::SubscriberInitExt, EnvFilter,
 };
-pub fn setup_tracing<Sink>(level: &str, sink: Sink)
+pub fn setup_tracing<Sink>(name: &str, level: &str, sink: Sink)
 where
     Sink: for<'a> MakeWriter<'a> + Send + Sync + 'static,
 {
@@ -16,7 +16,7 @@ where
     tracing_subscriber::registry()
         .with(filter)
         .with(JsonStorageLayer)
-        .with(BunyanFormattingLayer::new("axum_newsletter".into(), sink))
+        .with(BunyanFormattingLayer::new(name.into(), sink))
         .try_init()
         .expect("Failed to set subscriber.");
 }
