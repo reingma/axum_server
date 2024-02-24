@@ -13,6 +13,7 @@ use diesel_migrations::embed_migrations;
 use diesel_migrations::EmbeddedMigrations;
 use diesel_migrations::MigrationHarness;
 use once_cell::sync::Lazy;
+use secrecy::ExposeSecret;
 use std::future::IntoFuture;
 
 const MIGRATION: EmbeddedMigrations = embed_migrations!();
@@ -44,7 +45,7 @@ async fn spawn_app() -> TestApp {
     tokio::task::spawn_blocking(move || {
         let mut db_conn: AsyncConnectionWrapper<AsyncPgConnection> =
             AsyncConnectionWrapper::<AsyncPgConnection>::establish(
-                &conn_string,
+                conn_string.expose_secret(),
             )
             .expect("Error");
         tokio::task::block_in_place(move || {
@@ -54,7 +55,7 @@ async fn spawn_app() -> TestApp {
     .await
     .expect("thread panic");
     let pool_manager = AsyncDieselConnectionManager::<AsyncPgConnection>::new(
-        configuration.database.connection_string(),
+        configuration.database.connection_string().expose_secret(),
     );
     let pool = Pool::builder(pool_manager)
         .build()
@@ -70,7 +71,9 @@ async fn spawn_app() -> TestApp {
 
 async fn configure_database(db_settings: &DatabaseSettings) {
     let mut db_conn = AsyncPgConnection::establish(
-        &db_settings.connection_string_without_database(),
+        db_settings
+            .connection_string_without_database()
+            .expose_secret(),
     )
     .await
     .expect("Failed to connect");

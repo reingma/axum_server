@@ -1,3 +1,4 @@
+use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
 use tracing_subscriber::fmt::MakeWriter;
 use tracing_subscriber::{
     layer::SubscriberExt, util::SubscriberInitExt, EnvFilter,
@@ -14,7 +15,8 @@ where
     });
     tracing_subscriber::registry()
         .with(filter)
-        .with(tracing_subscriber::fmt::layer().with_writer(sink).json())
+        .with(JsonStorageLayer)
+        .with(BunyanFormattingLayer::new("axum_newsletter".into(), sink))
         .try_init()
         .expect("Failed to set subscriber.");
 }

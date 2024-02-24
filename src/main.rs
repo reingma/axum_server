@@ -5,6 +5,7 @@ use diesel_async::{
     pooled_connection::{deadpool::Pool, AsyncDieselConnectionManager},
     AsyncPgConnection,
 };
+use secrecy::ExposeSecret;
 #[tokio::main]
 async fn main() -> Result<(), std::io::Error> {
     setup_tracing("info", std::io::stdout);
@@ -17,7 +18,7 @@ async fn main() -> Result<(), std::io::Error> {
         listener.local_addr().unwrap()
     );
     let pool_manager = AsyncDieselConnectionManager::<AsyncPgConnection>::new(
-        configuration.database.connection_string(),
+        configuration.database.connection_string().expose_secret(),
     );
     let pool = Pool::builder(pool_manager)
         .build()
