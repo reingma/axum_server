@@ -18,11 +18,12 @@ diesel-async = { version = "0.4.1", features = ["postgres", "deadpool", "async-c
 diesel_migrations = { version = "2.1.0", features = ["postgres"] }
 once_cell = "1.19.0"
 reqwest = "0.11.24"
+secrecy = { version = "0.8.0", features = ["serde"] }
 serde = { version = "1.0.196", features = ["derive"] }
 tokio = { version = "1.35.1", features = ["macros", "rt-multi-thread"] }
 tower = "0.4.13"
 tower-http = { version = "0.5.2", features = ["trace"] }
 tracing = "0.1.40"
 tracing-bunyan-formatter = "0.3.9"
-tracing-subscriber = { version = "0.3.18", features = ["registry", "env-filter", "json"] }
+tracing-subscriber = { version = "0.3.18", features = ["registry", "env-filter"] }
 uuid = { version = "1.7.0", features = ["v7"] }
