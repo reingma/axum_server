@@ -1,6 +1,7 @@
 use axum_newsletter::configuration::get_configuration;
 use axum_newsletter::configuration::DatabaseSettings;
 use axum_newsletter::models::Subscriptions;
+use axum_newsletter::telemetry::setup_tracing;
 use diesel::prelude::*;
 use diesel::SelectableHelper;
 use diesel_async::async_connection_wrapper::AsyncConnectionWrapper;
@@ -11,15 +12,27 @@ use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use diesel_migrations::embed_migrations;
 use diesel_migrations::EmbeddedMigrations;
 use diesel_migrations::MigrationHarness;
+use once_cell::sync::Lazy;
 use std::future::IntoFuture;
 
 const MIGRATION: EmbeddedMigrations = embed_migrations!();
+
+static TRACING: Lazy<()> = Lazy::new(|| {
+    let default_filter = "debug";
+    if std::env::var("TEST_LOG").is_ok() {
+        setup_tracing(default_filter, std::io::stdout);
+    } else {
+        setup_tracing(default_filter, std::io::sink);
+    }
+});
 
 pub struct TestApp {
     pub address: String,
     pub pool: Pool<AsyncPgConnection>,
 }
 async fn spawn_app() -> TestApp {
+    Lazy::force(&TRACING);
+
     let listener = tokio::net::TcpListener::bind("0.0.0.0:0").await.unwrap();
     let port = listener.local_addr().unwrap().port();
     let mut configuration =
