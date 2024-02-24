@@ -1,6 +1,5 @@
 use diesel_async::pooled_connection::deadpool::Pool;
 use diesel_async::{pooled_connection::deadpool::Object, AsyncPgConnection};
-use tracing::Instrument;
 
 pub mod queries;
 
@@ -14,9 +13,7 @@ pub type DatabaseConnectionPool = Pool<AsyncPgConnection>;
 pub async fn get_connection(
     pool: Pool<AsyncPgConnection>,
 ) -> DatabaseConnection {
-    let pooling_span =
-        tracing::info_span!("Getting connection from database pool");
-    match pool.get().instrument(pooling_span).await {
+    match pool.get().await {
         Ok(conn) => {
             tracing::info!("Connection established.");
             conn
