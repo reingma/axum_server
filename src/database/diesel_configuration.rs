@@ -42,6 +42,7 @@ pub fn establish_connection(
 
 fn root_certificates() -> rustls::RootCertStore {
     let mut roots = rustls::RootCertStore::empty();
+    roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
     let certs = rustls_native_certs::load_native_certs()
         .expect("Certificates not loadable.");
     for cert in certs {

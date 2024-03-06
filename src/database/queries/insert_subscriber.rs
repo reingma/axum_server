@@ -1,5 +1,5 @@
 use crate::database::DatabaseConnection;
-use crate::routes::Subscriber;
+use crate::domain::NewSubscriber;
 use crate::{models::Subscriptions, schema::subscriptions};
 use diesel::result::Error;
 use diesel_async::RunQueryDsl;
@@ -9,11 +9,13 @@ use diesel_async::RunQueryDsl;
     skip(subscriber_data, connection)
 )]
 pub async fn insert_subscriber(
-    subscriber_data: Subscriber,
+    subscriber_data: NewSubscriber,
     connection: &mut DatabaseConnection,
 ) -> Result<(), Error> {
-    let subscription_entry =
-        Subscriptions::new(subscriber_data.email, subscriber_data.name);
+    let subscription_entry = Subscriptions::new(
+        subscriber_data.email,
+        subscriber_data.name.inner_ref().to_string(),
+    );
     match diesel::insert_into(subscriptions::table)
         .values(subscription_entry)
         .execute(connection)
