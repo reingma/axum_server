@@ -15,7 +15,7 @@ async fn main() -> Result<(), std::io::Error> {
     let listener = tokio::net::TcpListener::bind(address).await?;
     tracing::info!(
         "Server started listening on port {}",
-        configuration.database.connection_string().expose_secret()
+        listener.local_addr().unwrap()
     );
     tracing::info!(
         "Database connected to: {}",
