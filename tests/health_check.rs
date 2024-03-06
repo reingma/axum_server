@@ -6,7 +6,6 @@ use diesel::prelude::*;
 use diesel::SelectableHelper;
 use diesel_async::async_connection_wrapper::AsyncConnectionWrapper;
 use diesel_async::pooled_connection::deadpool::Pool;
-use diesel_async::pooled_connection::AsyncDieselConnectionManager;
 use diesel_async::AsyncConnection;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use diesel_migrations::embed_migrations;
@@ -54,12 +53,9 @@ async fn spawn_app() -> TestApp {
     })
     .await
     .expect("thread panic");
-    let pool_manager = AsyncDieselConnectionManager::<AsyncPgConnection>::new(
+    let pool = axum_newsletter::database::create_connection_pool(
         configuration.database.connection_string().expose_secret(),
     );
-    let pool = Pool::builder(pool_manager)
-        .build()
-        .expect("Failed to create connection pool");
 
     let server = axum_newsletter::startup::run(listener, pool.clone());
     tokio::spawn(server.into_future());
@@ -151,6 +147,37 @@ async fn subscribe_returns_422_when_data_is_missing() {
 
         assert_eq!(
             422,
+            response.status().as_u16(),
+            "The API did not fail with 422 Bad Request when the payload was {}",
+            message
+        );
+    }
+}
+#[tokio::test]
+async fn subscribe_returns_422_when_fields_are_present_but_empty() {
+    let test_app = spawn_app().await;
+    let client = reqwest::Client::new();
+
+    let test_cases = vec![
+        ("name=Gabriel%20Aguiar&email=", "missing email"),
+        (
+            "name=&email=gabriel.masarin.aguiar%40gmail.com",
+            "missing name",
+        ),
+        ("name=person&email=totallynotemail", "missing both"),
+    ];
+
+    for (body, message) in test_cases {
+        let response = client
+            .post(&format!("{}/subscriptions", &test_app.address))
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .body(body)
+            .send()
+            .await
+            .expect("Failed to execute request.");
+
+        assert_eq!(
+            200,
             response.status().as_u16(),
             "The API did not fail with 422 Bad Request when the payload was {}",
             message
