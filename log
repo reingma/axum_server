@@ -1,0 +1,31 @@
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 3 tests
+test health_check_responds_ok ... ok
+test subscribe_returns_422_when_data_is_missing ... ok
+test subscribe_returns_200_for_valid_form ... FAILED
+
+failures:
+
+---- subscribe_returns_200_for_valid_form stdout ----
+thread 'subscribe_returns_200_for_valid_form' panicked at src/database.rs:27:13:
+Failed to establish connection.
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+thread 'subscribe_returns_200_for_valid_form' panicked at tests/health_check.rs:114:10:
+Failed to execute request.: reqwest::Error { kind: Request, url: Url { scheme: "http", cannot_be_a_base: false, username: "", password: None, host: Some(Ipv4(127.0.0.1)), port: Some(40275), path: "/subscriptions", query: None, fragment: None }, source: hyper::Error(IncompleteMessage) }
+
+
+failures:
+    subscribe_returns_200_for_valid_form
+
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+
