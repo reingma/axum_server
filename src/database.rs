@@ -1,6 +1,7 @@
 use diesel_async::pooled_connection::deadpool::Pool;
 use diesel_async::{pooled_connection::deadpool::Object, AsyncPgConnection};
 
+pub mod diesel_configuration;
 pub mod queries;
 
 pub type DatabaseConnection = Object<AsyncPgConnection>;
@@ -27,3 +28,4 @@ pub async fn get_connection(
         }
     }
 }
+pub use diesel_configuration::create_connection_pool;

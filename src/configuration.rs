@@ -1,4 +1,6 @@
 use secrecy::{ExposeSecret, Secret};
+use serde::Deserialize;
+use serde_aux::field_attributes::deserialize_number_from_string;
 
 #[derive(serde::Deserialize)]
 pub struct Settings {
@@ -10,13 +12,44 @@ pub struct Settings {
 pub struct DatabaseSettings {
     pub username: String,
     pub password: Secret<String>,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
     pub port: u16,
     pub host: String,
     pub database_name: String,
+    pub require_ssl: PgSslMode,
+}
+
+pub enum PgSslMode {
+    Require,
+    Prefer,
+}
+
+impl std::fmt::Display for PgSslMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Require => write!(f, "require"),
+            Self::Prefer => write!(f, "prefer"),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for PgSslMode {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        match s.as_str() {
+            "prefered" => Ok(PgSslMode::Prefer),
+            "require" => Ok(PgSslMode::Require),
+            _ => Ok(PgSslMode::Prefer),
+        }
+    }
 }
 
 #[derive(serde::Deserialize)]
 pub struct ApplicationSettings {
+    #[serde(deserialize_with = "deserialize_number_from_string")]
     pub port: u16,
     pub host: String,
 }
@@ -24,21 +57,23 @@ pub struct ApplicationSettings {
 impl DatabaseSettings {
     pub fn connection_string(&self) -> Secret<String> {
         Secret::new(format!(
-            "postgres://{}:{}@{}:{}/{}",
+            "postgres://{}:{}@{}:{}/{}?sslmode={}",
             self.username,
             self.password.expose_secret(),
             self.host,
             self.port,
-            self.database_name
+            self.database_name,
+            self.require_ssl,
         ))
     }
     pub fn connection_string_without_database(&self) -> Secret<String> {
         Secret::new(format!(
-            "postgres://{}:{}@{}:{}",
+            "postgres://{}:{}@{}:{}?sslmode={}",
             self.username,
             self.password.expose_secret(),
             self.host,
-            self.port
+            self.port,
+            self.require_ssl
         ))
     }
 }
@@ -59,6 +94,11 @@ pub fn get_configuration() -> Result<Settings, config::ConfigError> {
         .add_source(config::File::from(
             configuration_directory.join(environment_filename.as_str()),
         ))
+        .add_source(
+            config::Environment::with_prefix("APP")
+                .prefix_separator("_")
+                .separator("__"),
+        )
         .build()?;
     settings.try_deserialize::<Settings>()
 }

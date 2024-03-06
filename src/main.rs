@@ -1,9 +1,6 @@
 use axum_newsletter::{
-    configuration::get_configuration, startup::run, telemetry::setup_tracing,
-};
-use diesel_async::{
-    pooled_connection::{deadpool::Pool, AsyncDieselConnectionManager},
-    AsyncPgConnection,
+    configuration::get_configuration, database::create_connection_pool,
+    startup::run, telemetry::setup_tracing,
 };
 use secrecy::ExposeSecret;
 #[tokio::main]
@@ -18,13 +15,15 @@ async fn main() -> Result<(), std::io::Error> {
     let listener = tokio::net::TcpListener::bind(address).await?;
     tracing::info!(
         "Server started listening on port {}",
-        listener.local_addr().unwrap()
+        configuration.database.connection_string().expose_secret()
     );
-    let pool_manager = AsyncDieselConnectionManager::<AsyncPgConnection>::new(
+    tracing::info!(
+        "Database connected to: {}",
+        configuration.database.connection_string().expose_secret()
+    );
+    let pool = create_connection_pool(
         configuration.database.connection_string().expose_secret(),
     );
-    let pool = Pool::builder(pool_manager)
-        .build()
-        .expect("Connection failed");
+
     run(listener, pool).await
 }
