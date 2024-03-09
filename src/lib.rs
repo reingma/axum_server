@@ -1,6 +1,7 @@
 pub mod configuration;
 pub mod database;
 pub mod domain;
+pub mod email_client;
 pub mod models;
 pub mod routes;
 pub mod schema;

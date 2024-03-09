@@ -2,3 +2,6 @@ application:
   host: 0.0.0.0
 database:
   require_ssl: require
+email_client:
+  base_url: https://api.postmarkapp.com
+  sender_email: gabriel.aguiar@reingma.com

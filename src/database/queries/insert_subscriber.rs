@@ -13,8 +13,8 @@ pub async fn insert_subscriber(
     connection: &mut DatabaseConnection,
 ) -> Result<(), Error> {
     let subscription_entry = Subscriptions::new(
-        subscriber_data.email,
-        subscriber_data.name.inner_ref().to_string(),
+        subscriber_data.email.as_ref().to_string(),
+        subscriber_data.name.as_ref().to_string(),
     );
     match diesel::insert_into(subscriptions::table)
         .values(subscription_entry)

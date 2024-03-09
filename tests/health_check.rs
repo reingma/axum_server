@@ -14,6 +14,7 @@ use diesel_migrations::MigrationHarness;
 use once_cell::sync::Lazy;
 use secrecy::ExposeSecret;
 use std::future::IntoFuture;
+use std::sync::Arc;
 
 const MIGRATION: EmbeddedMigrations = embed_migrations!();
 
@@ -57,7 +58,20 @@ async fn spawn_app() -> TestApp {
         configuration.database.connection_string().expose_secret(),
     );
 
-    let server = axum_newsletter::startup::run(listener, pool.clone());
+    let email_client = axum_newsletter::email_client::EmailClient::new(
+        &configuration.email_client.base_url,
+        configuration
+            .email_client
+            .sender()
+            .expect("No sender defined"),
+        configuration.email_client.api_token,
+    );
+
+    let server = axum_newsletter::startup::run(
+        listener,
+        pool.clone(),
+        Arc::new(email_client),
+    );
     tokio::spawn(server.into_future());
     TestApp {
         address: format!("http://127.0.0.1:{}", port),
@@ -154,16 +168,16 @@ async fn subscribe_returns_422_when_data_is_missing() {
     }
 }
 #[tokio::test]
-async fn subscribe_returns_422_when_fields_are_present_but_empty() {
+async fn subscribe_returns_400_when_fields_are_present_but_empty() {
     let test_app = spawn_app().await;
     let client = reqwest::Client::new();
 
     let test_cases = vec![
-        ("name=Gabriel%20Aguiar&email=", "missing email"),
         (
-            "name=&email=gabriel.masarin.aguiar%40gmail.com",
+            "name= &email=gabriel.masarin.aguiar%40gmail.com",
             "missing name",
         ),
+        ("name=Gabriel%20Aguiar&email=", "missing email"),
         ("name=person&email=totallynotemail", "missing both"),
     ];
 
@@ -177,9 +191,9 @@ async fn subscribe_returns_422_when_fields_are_present_but_empty() {
             .expect("Failed to execute request.");
 
         assert_eq!(
-            200,
+            400,
             response.status().as_u16(),
-            "The API did not fail with 422 Bad Request when the payload was {}",
+            "The API did not fail with 400 Bad Request when the payload was {}",
             message
         );
     }
