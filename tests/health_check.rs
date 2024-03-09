@@ -58,6 +58,7 @@ async fn spawn_app() -> TestApp {
         configuration.database.connection_string().expose_secret(),
     );
 
+    let timeout = configuration.email_client.timeout();
     let email_client = axum_newsletter::email_client::EmailClient::new(
         &configuration.email_client.base_url,
         configuration
@@ -65,6 +66,7 @@ async fn spawn_app() -> TestApp {
             .sender()
             .expect("No sender defined"),
         configuration.email_client.api_token,
+        timeout,
     );
 
     let server = axum_newsletter::startup::run(

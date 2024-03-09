@@ -14,6 +14,7 @@ async fn main() -> Result<(), std::io::Error> {
         "{}:{}",
         configuration.application.host, configuration.application.port
     );
+    let timeout = configuration.email_client.timeout();
     let email_client = EmailClient::new(
         &configuration.email_client.base_url,
         configuration
@@ -21,7 +22,9 @@ async fn main() -> Result<(), std::io::Error> {
             .sender()
             .expect("Sender email invalid"),
         configuration.email_client.api_token,
+        timeout,
     );
+
     let listener = tokio::net::TcpListener::bind(address).await?;
     tracing::info!(
         "Server started listening on port {}",
