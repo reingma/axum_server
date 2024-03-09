@@ -1,6 +1,6 @@
 use crate::{
     database::{queries::insert_subscriber, DatabaseConnectionPool},
-    domain::{NewSubscriber, SubscriberName},
+    domain::NewSubscriber,
 };
 use axum::{extract::State, http::StatusCode, Form};
 
@@ -22,9 +22,9 @@ pub async fn subscriptions(
     State(pool): State<DatabaseConnectionPool>,
     Form(subscriber): Form<Subscriber>,
 ) -> StatusCode {
-    let new_subscriber = NewSubscriber {
-        email: subscriber.email,
-        name: SubscriberName::parse(subscriber.name),
+    let new_subscriber: NewSubscriber = match subscriber.try_into() {
+        Ok(new_subscriber) => new_subscriber,
+        Err(_) => return StatusCode::BAD_REQUEST,
     };
     tracing::info!("Adding a new subscriber to the database.");
 
