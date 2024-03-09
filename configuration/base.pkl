@@ -8,3 +8,6 @@ database {
     password = "password"
     database_name = "newsletter"
 }
+email_client {
+    timeout_ms = 10000
+}
