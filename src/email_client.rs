@@ -186,14 +186,8 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let subscriber_email =
-            SubscriberEmail::try_from(SafeEmail().fake::<String>())
-                .expect("Email should be valid");
-        let subject: String = Sentence(1..2).fake();
-        let content: String = Paragraph(1..10).fake();
-
         let outcome = email_client
-            .send_email(subscriber_email, &content, &content, &subject)
+            .send_email(email(), &content(), &content(), &subject())
             .await;
 
         assert_err!(outcome);

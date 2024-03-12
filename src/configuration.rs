@@ -4,14 +4,14 @@ use serde_aux::field_attributes::deserialize_number_from_string;
 
 use crate::domain::SubscriberEmail;
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, Clone)]
 pub struct Settings {
     pub database: DatabaseSettings,
     pub application: ApplicationSettings,
     pub email_client: EmailClientSettings,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, Clone)]
 pub struct EmailClientSettings {
     pub base_url: String,
     pub sender_email: String,
@@ -29,7 +29,14 @@ impl EmailClientSettings {
     }
 }
 
-#[derive(serde::Deserialize)]
+#[derive(Clone, serde::Deserialize)]
+pub struct ApplicationSettings {
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub port: u16,
+    pub host: String,
+}
+
+#[derive(serde::Deserialize, Clone)]
 pub struct DatabaseSettings {
     pub username: String,
     pub password: Secret<String>,
@@ -40,6 +47,31 @@ pub struct DatabaseSettings {
     pub require_ssl: PgSslMode,
 }
 
+impl DatabaseSettings {
+    pub fn connection_string(&self) -> Secret<String> {
+        Secret::new(format!(
+            "postgres://{}:{}@{}:{}/{}?sslmode={}",
+            self.username,
+            self.password.expose_secret(),
+            self.host,
+            self.port,
+            self.database_name,
+            self.require_ssl,
+        ))
+    }
+    pub fn connection_string_without_database(&self) -> Secret<String> {
+        Secret::new(format!(
+            "postgres://{}:{}@{}:{}?sslmode={}",
+            self.username,
+            self.password.expose_secret(),
+            self.host,
+            self.port,
+            self.require_ssl
+        ))
+    }
+}
+
+#[derive(Clone)]
 pub enum PgSslMode {
     Require,
     Prefer,
@@ -68,34 +100,17 @@ impl<'de> Deserialize<'de> for PgSslMode {
     }
 }
 
-#[derive(serde::Deserialize)]
-pub struct ApplicationSettings {
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub port: u16,
-    pub host: String,
+pub enum Environment {
+    Development,
+    Production,
 }
 
-impl DatabaseSettings {
-    pub fn connection_string(&self) -> Secret<String> {
-        Secret::new(format!(
-            "postgres://{}:{}@{}:{}/{}?sslmode={}",
-            self.username,
-            self.password.expose_secret(),
-            self.host,
-            self.port,
-            self.database_name,
-            self.require_ssl,
-        ))
-    }
-    pub fn connection_string_without_database(&self) -> Secret<String> {
-        Secret::new(format!(
-            "postgres://{}:{}@{}:{}?sslmode={}",
-            self.username,
-            self.password.expose_secret(),
-            self.host,
-            self.port,
-            self.require_ssl
-        ))
+impl Environment {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Environment::Development => "development",
+            Environment::Production => "production",
+        }
     }
 }
 
@@ -122,20 +137,6 @@ pub fn get_configuration() -> Result<Settings, config::ConfigError> {
         )
         .build()?;
     settings.try_deserialize::<Settings>()
-}
-
-pub enum Environment {
-    Development,
-    Production,
-}
-
-impl Environment {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Environment::Development => "development",
-            Environment::Production => "production",
-        }
-    }
 }
 
 impl TryFrom<String> for Environment {
