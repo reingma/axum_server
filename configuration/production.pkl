@@ -7,4 +7,5 @@ database {
 email_client {
     base_url = "https://api.postmarkapp.com"
     sender_email = "gabriel.aguiar@reingma.com"
+    api_token = "very_secret"
 }
