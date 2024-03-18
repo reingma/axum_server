@@ -8,7 +8,7 @@ use diesel_async::pooled_connection::ManagerConfig;
 use diesel_async::AsyncPgConnection;
 use futures_util::future::BoxFuture;
 use futures_util::FutureExt;
-use rustls::crypto::aws_lc_rs as provider;
+use rustls::crypto::ring as provider;
 
 pub fn create_connection_pool(url: &str) -> DatabaseConnectionPool {
     let mut config = ManagerConfig::default();
