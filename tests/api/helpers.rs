@@ -1,7 +1,10 @@
 use axum_newsletter::configuration::get_configuration;
 use axum_newsletter::configuration::DatabaseSettings;
+use axum_newsletter::database::DatabaseConnection;
+use axum_newsletter::models::Subscriptions;
 use axum_newsletter::telemetry::setup_tracing;
 use diesel::prelude::*;
+use diesel::SelectableHelper;
 use diesel_async::async_connection_wrapper::AsyncConnectionWrapper;
 use diesel_async::pooled_connection::deadpool::Pool;
 use diesel_async::AsyncConnection;
@@ -104,4 +107,18 @@ async fn configure_database(db_settings: &DatabaseSettings) {
     })
     .await
     .expect("thread panic");
+}
+
+pub async fn check_subscriber_existance(
+    connection: &mut DatabaseConnection,
+    subscriber_email: &str,
+) -> Vec<axum_newsletter::models::Subscriptions> {
+    use axum_newsletter::schema::subscriptions::dsl::*;
+    subscriptions
+        .limit(1)
+        .filter(email.eq(subscriber_email))
+        .select(Subscriptions::as_select())
+        .load(connection)
+        .await
+        .expect("Failed to read query")
 }

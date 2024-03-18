@@ -1,12 +1,7 @@
 use crate::helpers::spawn_app;
-use axum_newsletter::models::Subscriptions;
-use diesel::prelude::*;
-use diesel::SelectableHelper;
-use diesel_async::RunQueryDsl;
 
 #[tokio::test]
 async fn subscribe_returns_200_for_valid_form() {
-    use axum_newsletter::schema::subscriptions::dsl::*;
     let test_app = spawn_app().await;
 
     let body = "name=Gabriel%20Aguiar&email=gabriel.masarin.aguiar%40gmail.com";
@@ -18,13 +13,11 @@ async fn subscribe_returns_200_for_valid_form() {
     assert_eq!(200, response.status().as_u16());
     let mut connection =
         test_app.pool.get().await.expect("Could not get connection");
-    let results = subscriptions
-        .limit(1)
-        .filter(name.eq("Gabriel Aguiar"))
-        .select(Subscriptions::as_select())
-        .load(&mut connection)
-        .await
-        .expect("Failed to read query");
+    let results = crate::helpers::check_subscriber_existance(
+        &mut connection,
+        "gabriel.masarin.aguiar@gmail.com",
+    )
+    .await;
     assert_eq!(results.len(), 1);
 }
 #[tokio::test]
