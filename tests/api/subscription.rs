@@ -19,6 +19,8 @@ async fn subscribe_returns_200_for_valid_form() {
     )
     .await;
     assert_eq!(results.len(), 1);
+    let particular = results.first().unwrap();
+    assert_eq!(particular.status.as_ref().unwrap(), "confirmed")
 }
 #[tokio::test]
 async fn subscribe_returns_422_when_data_is_missing() {
