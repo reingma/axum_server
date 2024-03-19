@@ -6,6 +6,6 @@ diesel::table! {
         email -> Text,
         name -> Text,
         subscribed_at -> Timestamptz,
-        status -> Nullable<Text>,
+        status -> Text,
     }
 }

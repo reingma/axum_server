@@ -9,7 +9,7 @@ pub struct Subscriptions {
     pub id: Uuid,
     pub email: String,
     pub name: String,
-    pub status: Option<String>,
+    pub status: String,
     pub subscribed_at: DateTime<Utc>,
 }
 
@@ -20,7 +20,7 @@ impl Subscriptions {
             email,
             name,
             subscribed_at: Utc::now(),
-            status: Some("confirmed".to_string()),
+            status: "confirmed".to_string(),
         }
     }
 }
