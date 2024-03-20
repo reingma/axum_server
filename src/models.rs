@@ -31,7 +31,7 @@ impl Subscriptions {
 pub struct SubscriptionTokens {
     pub subscriber_id: Uuid,
     pub subscription_token: String,
-    pub generated_at: Option<DateTime<Utc>>,
+    pub generated_at: DateTime<Utc>,
 }
 
 impl SubscriptionTokens {
@@ -39,7 +39,7 @@ impl SubscriptionTokens {
         Self {
             subscriber_id: *sub_id,
             subscription_token: token.to_string(),
-            generated_at: Some(Utc::now()),
+            generated_at: Utc::now(),
         }
     }
 }
