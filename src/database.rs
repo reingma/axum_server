@@ -1,3 +1,4 @@
+use axum::extract::FromRef;
 use diesel_async::pooled_connection::deadpool::Pool;
 use diesel_async::{pooled_connection::deadpool::Object, AsyncPgConnection};
 
@@ -29,3 +30,11 @@ pub async fn get_connection(
     }
 }
 pub use diesel_configuration::create_connection_pool;
+
+use crate::startup::ApplicationState;
+
+impl FromRef<ApplicationState> for DatabaseConnectionPool {
+    fn from_ref(input: &ApplicationState) -> Self {
+        input.database_pool.clone()
+    }
+}

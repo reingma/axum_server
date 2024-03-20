@@ -1,4 +1,4 @@
-use crate::database::create_connection_pool;
+use crate::database::{create_connection_pool, DatabaseConnectionPool};
 use crate::{configuration::Settings, email_client::EmailClient, routes};
 use axum::{extract::Request, routing, serve::Serve, Router};
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
@@ -13,21 +13,34 @@ pub fn run(
     listener: TcpListener,
     connection_pool: Pool<AsyncPgConnection>,
     email_client: Arc<EmailClient>,
+    base_url: String,
 ) -> Serve<Router, Router> {
+    let app_state = ApplicationState {
+        database_pool: connection_pool,
+        email_client,
+        base_url,
+    };
     let app: Router = Router::new()
         .route("/", routing::get(routes::greet))
         .route("/health_check", routing::get(routes::health_check))
         .route("/subscriptions", routing::post(routes::subscriptions))
+        .route("/subscriptions/confirm", routing::get(routes::confirm))
         .layer(TraceLayer::new_for_http().make_span_with(
             |request: &Request<_>| {
                 let request_id = Uuid::now_v7();
                 info_span!("Http Request", %request_id, request_uri = %request.uri())
             },
         ))
-        .with_state(connection_pool)
-        .with_state(email_client);
+        .with_state(app_state);
 
     axum::serve(listener, app)
+}
+
+#[derive(Clone)]
+pub struct ApplicationState {
+    pub database_pool: DatabaseConnectionPool,
+    pub email_client: Arc<EmailClient>,
+    pub base_url: String,
 }
 
 pub struct Application {
@@ -67,7 +80,12 @@ impl Application {
 
         Ok(Application {
             pool: pool.clone(),
-            server: run(listener, pool, Arc::new(email_client)),
+            server: run(
+                listener,
+                pool,
+                Arc::new(email_client),
+                configuration.application.base_url,
+            ),
             port,
         })
     }
