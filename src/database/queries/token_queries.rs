@@ -3,6 +3,7 @@ use crate::{
     models::SubscriptionTokens,
     schema::{self, subscriptions},
 };
+use chrono::{Duration, Utc};
 use diesel::prelude::*;
 use diesel::result::Error;
 use diesel::SelectableHelper;
@@ -46,7 +47,11 @@ pub async fn get_subscriber_id_for_token(
     token: &str,
 ) -> Result<Option<Uuid>, diesel::result::Error> {
     let subscriber = subscription_tokens
-        .filter(subscription_token.eq(token))
+        .filter(
+            subscription_token
+                .eq(token)
+                .and(generated_at.gt(Utc::now() - Duration::days(1))),
+        )
         .select(SubscriptionTokens::as_select())
         .first(connection)
         .await
