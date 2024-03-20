@@ -1,6 +1,10 @@
 use crate::domain::SubscriberEmail;
 use reqwest::Client;
 use secrecy::{ExposeSecret, Secret};
+
+pub mod send;
+
+#[derive(Debug)]
 pub struct EmailClient {
     api_token: Secret<String>,
     sender: SubscriberEmail,

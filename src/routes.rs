@@ -1,7 +1,9 @@
-pub mod greet;
-pub mod health_check;
-pub mod subscriptions;
+mod confirm_subscriptions;
+mod greet;
+mod health_check;
+mod subscriptions;
 
+pub use confirm_subscriptions::*;
 pub use greet::*;
 pub use health_check::*;
 pub use subscriptions::*;

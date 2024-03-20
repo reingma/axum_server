@@ -20,7 +20,15 @@ impl Subscriptions {
             email,
             name,
             subscribed_at: Utc::now(),
-            status: "confirmed".to_string(),
+            status: "pending_confirmation".to_string(),
         }
     }
+}
+
+#[derive(Insertable, Queryable, Selectable)]
+#[diesel(table_name = crate::schema::subscription_tokens)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct SubscriptionTokens {
+    pub subscriber_id: Uuid,
+    pub subscription_token: String,
 }

@@ -16,6 +16,7 @@ use once_cell::sync::Lazy;
 use reqwest::Client;
 use secrecy::ExposeSecret;
 use std::future::IntoFuture;
+use wiremock::MockServer;
 
 const MIGRATION: EmbeddedMigrations = embed_migrations!();
 
@@ -28,10 +29,18 @@ static TRACING: Lazy<()> = Lazy::new(|| {
     }
 });
 
+pub struct ConfirmationLinks {
+    pub html: reqwest::Url,
+    pub plain_text: reqwest::Url,
+}
+
 pub struct TestApp {
     pub address: String,
     pub pool: Pool<AsyncPgConnection>,
+    pub email_server: MockServer,
+    pub server_port: u16,
 }
+
 impl TestApp {
     pub async fn subscribe(
         &self,
@@ -53,14 +62,40 @@ impl TestApp {
             .send()
             .await
     }
+
+    pub async fn get_confirmation_links(
+        &self,
+        email_request: &wiremock::Request,
+    ) -> ConfirmationLinks {
+        let body: serde_json::Value =
+            serde_json::from_slice(&email_request.body).unwrap();
+
+        let get_link = |s: &str| {
+            let links: Vec<_> = linkify::LinkFinder::new()
+                .links(s)
+                .filter(|l| *l.kind() == linkify::LinkKind::Url)
+                .collect();
+            assert_eq!(links.len(), 1);
+            let raw_link = links[0].as_str().to_owned();
+            let mut confirmation_link = reqwest::Url::parse(&raw_link).unwrap();
+            assert_eq!(confirmation_link.host_str().unwrap(), "127.0.0.1");
+            confirmation_link.set_port(Some(self.server_port)).unwrap();
+            confirmation_link
+        };
+        let html = get_link(body["HtmlBody"].as_str().unwrap());
+        let plain_text = get_link(body["TextBody"].as_str().unwrap());
+        ConfirmationLinks { html, plain_text }
+    }
 }
 pub async fn spawn_app() -> TestApp {
     Lazy::force(&TRACING);
 
+    let email_server = MockServer::start().await;
     let configuration = {
         let mut c = get_configuration().expect("failed to get configuration");
         c.database.database_name = uuid::Uuid::now_v7().to_string();
         c.application.port = 0;
+        c.email_client.base_url = email_server.uri();
         c
     };
 
@@ -73,6 +108,8 @@ pub async fn spawn_app() -> TestApp {
     let testapp = TestApp {
         address: format!("http://127.0.0.1:{}", application.port()),
         pool: application.pool(),
+        email_server,
+        server_port: application.port(),
     };
     tokio::spawn(application.run_until_stopped().into_future());
     testapp
