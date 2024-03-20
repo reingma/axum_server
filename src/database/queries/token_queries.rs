@@ -20,10 +20,7 @@ pub async fn store_token(
     subscriber_token: &str,
     sub_id: &Uuid,
 ) -> Result<(), Error> {
-    let token_entry = SubscriptionTokens {
-        subscription_token: subscriber_token.to_string(),
-        subscriber_id: *sub_id,
-    };
+    let token_entry = SubscriptionTokens::new(subscriber_token, sub_id);
     match diesel::insert_into(schema::subscription_tokens::table)
         .values(&token_entry)
         .execute(connection)

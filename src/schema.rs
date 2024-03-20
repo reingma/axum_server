@@ -4,6 +4,7 @@ diesel::table! {
     subscription_tokens (subscription_token) {
         subscription_token -> Text,
         subscriber_id -> Uuid,
+        generated_at -> Nullable<Timestamptz>,
     }
 }
 

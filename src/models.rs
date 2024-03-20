@@ -31,4 +31,15 @@ impl Subscriptions {
 pub struct SubscriptionTokens {
     pub subscriber_id: Uuid,
     pub subscription_token: String,
+    pub generated_at: Option<DateTime<Utc>>,
+}
+
+impl SubscriptionTokens {
+    pub fn new(token: &str, sub_id: &Uuid) -> Self {
+        Self {
+            subscriber_id: *sub_id,
+            subscription_token: token.to_string(),
+            generated_at: Some(Utc::now()),
+        }
+    }
 }
