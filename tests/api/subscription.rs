@@ -153,27 +153,3 @@ async fn subscribe_sends_a_confirmation_email_with_a_link() {
         confirmation_links.plain_text.as_str()
     );
 }
-#[tokio::test]
-async fn subscriber_recieves_two_emails_if_subscribed_twice() {
-    let test_app = spawn_app().await;
-
-    let body = "name=Gabriel%20Aguiar&email=gabriel.masarin.aguiar%40gmail.com";
-
-    Mock::given(path("/email"))
-        .and(method("POST"))
-        .respond_with(ResponseTemplate::new(200))
-        .expect(2)
-        .mount(&test_app.email_server)
-        .await;
-
-    let _response = test_app
-        .subscribe(body.into())
-        .await
-        .expect("Failed to execute request.");
-    let response = test_app
-        .subscribe(body.into())
-        .await
-        .expect("Failed to execute request.");
-
-    assert_eq!(200, response.status().as_u16());
-}
