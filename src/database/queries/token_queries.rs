@@ -1,7 +1,7 @@
 use crate::{
     database::DatabaseConnection,
     models::SubscriptionTokens,
-    schema::{self, subscription_tokens::subscription_token, subscriptions},
+    schema::{self, subscriptions},
 };
 use diesel::prelude::*;
 use diesel::result::Error;
