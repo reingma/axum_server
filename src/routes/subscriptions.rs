@@ -1,3 +1,6 @@
+use std::sync::Arc;
+
+use crate::domain::SubscriptionToken;
 use crate::{
     database::queries, database::queries::insert_subscriber,
     domain::NewSubscriber, email_client::send::send_confirmation_email,
@@ -6,9 +9,6 @@ use crate::{
 use axum::{extract::State, http::StatusCode, Form};
 use diesel_async::scoped_futures::ScopedFutureExt;
 use diesel_async::AsyncConnection;
-use rand::distributions::Alphanumeric;
-use rand::thread_rng;
-use rand::Rng;
 
 #[derive(serde::Deserialize)]
 pub struct Subscriber {
@@ -37,15 +37,15 @@ pub async fn subscriptions(
     let mut connection =
         crate::database::get_connection(app_state.database_pool).await;
 
-    let subscription_token = generate_subscription_token();
-    let copy = subscription_token.clone();
+    let subscription_token = Arc::new(SubscriptionToken::generate());
     if connection
         .transaction::<_, diesel::result::Error, _>(|conn| {
             async move {
                 let subscriber_id =
                     insert_subscriber(conn, &new_subscriber).await?;
 
-                queries::store_token(conn, &copy, &subscriber_id).await?;
+                queries::store_token(conn, &subscription_token, &subscriber_id)
+                    .await?;
                 send_confirmation_email(
                     &app_state.email_client,
                     new_subscriber,
@@ -65,12 +65,4 @@ pub async fn subscriptions(
     }
 
     return StatusCode::OK;
-}
-
-fn generate_subscription_token() -> String {
-    let mut rng = thread_rng();
-    std::iter::repeat_with(|| rng.sample(Alphanumeric))
-        .map(char::from)
-        .take(25)
-        .collect()
 }

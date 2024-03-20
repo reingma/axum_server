@@ -13,6 +13,9 @@ use diesel_migrations::embed_migrations;
 use diesel_migrations::EmbeddedMigrations;
 use diesel_migrations::MigrationHarness;
 use once_cell::sync::Lazy;
+use rand::distributions::Alphanumeric;
+use rand::thread_rng;
+use rand::Rng;
 use reqwest::Client;
 use secrecy::ExposeSecret;
 use std::future::IntoFuture;
@@ -158,4 +161,12 @@ pub async fn check_subscriber_existance(
         .load(connection)
         .await
         .expect("Failed to read query")
+}
+
+pub fn generate_valid_subscriber_token() -> String {
+    let mut rng = thread_rng();
+    std::iter::repeat_with(|| rng.sample(Alphanumeric))
+        .map(char::from)
+        .take(25)
+        .collect()
 }

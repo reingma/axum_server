@@ -1,4 +1,4 @@
-use crate::domain::NewSubscriber;
+use crate::domain::{NewSubscriber, SubscriptionToken};
 
 use super::EmailClient;
 
@@ -10,11 +10,12 @@ pub async fn send_confirmation_email(
     email_client: &EmailClient,
     new_subscriber: NewSubscriber,
     base_url: &str,
-    token: &str,
+    token: &SubscriptionToken,
 ) -> Result<(), String> {
     let confirmation_link = format!(
         "{}/subscriptions/confirm?subscription_token={}",
-        base_url, token
+        base_url,
+        token.as_ref()
     );
     let plain_text_body = format!("Welcome to reingma's newsletter!\nVisit {} to confirm your subscription.",
                         confirmation_link);

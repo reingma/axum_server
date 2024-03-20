@@ -1,5 +1,6 @@
 use crate::{
     database::DatabaseConnection,
+    domain::SubscriptionToken,
     models::SubscriptionTokens,
     schema::{self, subscriptions},
 };
@@ -18,10 +19,11 @@ use uuid::Uuid;
 )]
 pub async fn store_token(
     connection: &mut DatabaseConnection,
-    subscriber_token: &str,
+    subscriber_token: &SubscriptionToken,
     sub_id: &Uuid,
 ) -> Result<(), Error> {
-    let token_entry = SubscriptionTokens::new(subscriber_token, sub_id);
+    let token_entry =
+        SubscriptionTokens::new(subscriber_token.as_ref(), sub_id);
     match diesel::insert_into(schema::subscription_tokens::table)
         .values(&token_entry)
         .execute(connection)

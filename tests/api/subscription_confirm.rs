@@ -3,7 +3,7 @@ use wiremock::{
     Mock, ResponseTemplate,
 };
 
-use crate::helpers::spawn_app;
+use crate::helpers::{generate_valid_subscriber_token, spawn_app};
 
 #[tokio::test]
 async fn confirmations_without_token_are_rejected_with_a_400() {
@@ -130,4 +130,18 @@ async fn user_can_click_confirmation_link_twice_with_no_issues() {
     assert_eq!(results.len(), 1);
     let subscriber_data = results.first().unwrap();
     assert_eq!(subscriber_data.status, "confirmed");
+}
+#[tokio::test]
+async fn confirmations_with_unexisting_but_well_formated_token_are_rejected_with_unauthorized(
+) {
+    let test_app = spawn_app().await;
+
+    let response = reqwest::get(&format!(
+        "{}/subscriptions/confirm?subscription_token={}",
+        test_app.address,
+        generate_valid_subscriber_token()
+    ))
+    .await
+    .unwrap();
+    assert_eq!(response.status().as_u16(), 401);
 }
