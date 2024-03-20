@@ -1,7 +1,9 @@
 use crate::database::DatabaseConnection;
 use crate::domain::NewSubscriber;
+use crate::schema;
 use crate::{models::Subscriptions, schema::subscriptions};
 use diesel::result::Error;
+use diesel::ExpressionMethods;
 use diesel_async::RunQueryDsl;
 use uuid::Uuid;
 
@@ -19,16 +21,20 @@ pub async fn insert_subscriber(
     );
     match diesel::insert_into(subscriptions::table)
         .values(&subscription_entry)
-        .execute(connection)
+        .on_conflict(schema::subscriptions::email)
+        .do_update()
+        .set(schema::subscriptions::email.eq(&subscription_entry.email))
+        .returning(schema::subscriptions::id)
+        .get_result::<Uuid>(connection)
         .await
     {
-        Ok(_) => {
+        Ok(id) => {
             tracing::info!("New subscriber details have been saved");
-            Ok(subscription_entry.id)
+            Ok(id)
         }
         Err(e) => {
             tracing::error!("Failed to execute query {:?}", e);
-            return Err(e);
+            Err(e)
         }
     }
 }
