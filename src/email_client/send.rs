@@ -1,4 +1,7 @@
-use crate::domain::{NewSubscriber, SubscriptionToken};
+use crate::{
+    domain::{NewSubscriber, SubscriptionToken},
+    TEMPLATES,
+};
 
 use super::EmailClient;
 
@@ -17,10 +20,15 @@ pub async fn send_confirmation_email(
         base_url,
         token.as_ref()
     );
+    let mut tera_context = tera::Context::new();
+    tera_context.insert("link", &confirmation_link);
+    let html_body = TEMPLATES
+        .render("emails/subscription_email.html", &tera_context)
+        .map_err(|e| {
+            format!("Could not render email html with error: {:?}", e)
+        })?;
+    tracing::info!("Email sent to subscriber.");
     let plain_text_body = format!("Welcome to reingma's newsletter!\nVisit {} to confirm your subscription.",
-                        confirmation_link);
-    let html_body = format!("Welcome to reingma's newsletter!<br />\
-                        Click <a href=\"{}\">here</a> to confirm your subscription.", 
                         confirmation_link);
     email_client
         .send_email(
