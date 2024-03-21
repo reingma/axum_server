@@ -46,15 +46,23 @@ pub async fn subscriptions(
 
                 queries::store_token(conn, &subscription_token, &subscriber_id)
                     .await?;
-                send_confirmation_email(
+                match send_confirmation_email(
                     &app_state.email_client,
                     new_subscriber,
                     &app_state.base_url,
                     &subscription_token,
                 )
                 .await
-                .map_err(|_| diesel::result::Error::RollbackTransaction)?;
-                Ok(())
+                {
+                    Ok(_) => Ok(()),
+                    Err(e) => {
+                        tracing::error!(
+                            "Could not send Email with reason {:?}",
+                            e
+                        );
+                        Err(diesel::result::Error::RollbackTransaction)
+                    }
+                }
             }
             .scope_boxed()
         })
