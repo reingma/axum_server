@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 set -euo pipefail
 
 openssl req -new -text -passout pass:abcd -subj /CN=localhost -out keys/server.req -keyout keys/privkey.pem
