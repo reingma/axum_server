@@ -1,13 +1,9 @@
-#!/usr/bin/bash
+#!/usr/bin/env bash
 set -x
 set -eo pipefail
 
 if ! [ -x "$(command -v psql)" ]; then
     echo >&2 "Error: psql is not installed."
-    exit 1
-fi
-if [ -x "$(ldconfig -p | grep -c libpq)" ]; then
-    echo >&2 "Error: libpq is not installed."
     exit 1
 fi
 if ! [ -x "$(command -v diesel)" ]; then
