@@ -7,7 +7,7 @@ use crate::helpers::{generate_valid_subscriber_token, spawn_app};
 
 #[tokio::test]
 async fn confirmations_without_token_are_rejected_with_a_400() {
-    let test_app = spawn_app().await;
+    let test_app = spawn_app(None).await;
 
     let response =
         reqwest::get(&format!("{}/subscriptions/confirm", test_app.address))
@@ -17,7 +17,7 @@ async fn confirmations_without_token_are_rejected_with_a_400() {
 }
 #[tokio::test]
 async fn link_on_subscribe_returns_200_when_clicked() {
-    let test_app = spawn_app().await;
+    let test_app = spawn_app(None).await;
 
     let body = "name=Gabriel%20Aguiar&email=gabriel.masarin.aguiar%40gmail.com";
 
@@ -42,7 +42,7 @@ async fn link_on_subscribe_returns_200_when_clicked() {
 }
 #[tokio::test]
 async fn clicking_on_confirmation_link_sets_subscriber_status_to_confirmed() {
-    let test_app = spawn_app().await;
+    let test_app = spawn_app(None).await;
 
     let body = "name=Gabriel%20Aguiar&email=gabriel.masarin.aguiar%40gmail.com";
 
@@ -80,7 +80,7 @@ async fn clicking_on_confirmation_link_sets_subscriber_status_to_confirmed() {
 }
 #[tokio::test]
 async fn user_can_click_confirmation_link_twice_with_no_issues() {
-    let test_app = spawn_app().await;
+    let test_app = spawn_app(None).await;
 
     let body = "name=Gabriel%20Aguiar&email=gabriel.masarin.aguiar%40gmail.com";
 
@@ -134,7 +134,7 @@ async fn user_can_click_confirmation_link_twice_with_no_issues() {
 #[tokio::test]
 async fn confirmations_with_unexisting_but_well_formated_token_are_rejected_with_unauthorized(
 ) {
-    let test_app = spawn_app().await;
+    let test_app = spawn_app(None).await;
 
     let response = reqwest::get(&format!(
         "{}/subscriptions/confirm?subscription_token={}",

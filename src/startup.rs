@@ -1,12 +1,14 @@
 use crate::database::{create_connection_pool, DatabaseConnectionPool};
 use crate::{configuration::Settings, email_client::EmailClient, routes};
+use axum::response::Response;
 use axum::{extract::Request, routing, serve::Serve, Router};
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
 use secrecy::ExposeSecret;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::net::TcpListener;
 use tower_http::trace::TraceLayer;
-use tracing::info_span;
+use tracing::{info_span, Span};
 use uuid::Uuid;
 
 pub fn run(
@@ -28,9 +30,11 @@ pub fn run(
         .layer(TraceLayer::new_for_http().make_span_with(
             |request: &Request<_>| {
                 let request_id = Uuid::now_v7();
-                info_span!("Http Request", %request_id, request_uri = %request.uri())
-            },
-        ))
+                info_span!("Http Request", %request_id, request_uri = %request.uri(), response_code = tracing::field::Empty)
+            }
+        ).on_response(|response: &Response, _latency: Duration, span: &Span|{
+                span.record("response_code", response.status().as_str());
+            }))
         .with_state(app_state);
 
     axum::serve(listener, app)

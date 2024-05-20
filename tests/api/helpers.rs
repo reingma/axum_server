@@ -90,7 +90,7 @@ impl TestApp {
         ConfirmationLinks { html, plain_text }
     }
 }
-pub async fn spawn_app() -> TestApp {
+pub async fn spawn_app(migration: Option<EmbeddedMigrations>) -> TestApp {
     Lazy::force(&TRACING);
 
     let email_server = MockServer::start().await;
@@ -102,7 +102,7 @@ pub async fn spawn_app() -> TestApp {
         c
     };
 
-    configure_database(&configuration.database).await;
+    configure_database(&configuration.database, migration).await;
 
     let application =
         axum_newsletter::startup::Application::build(configuration)
@@ -118,7 +118,10 @@ pub async fn spawn_app() -> TestApp {
     testapp
 }
 
-async fn configure_database(db_settings: &DatabaseSettings) {
+async fn configure_database(
+    db_settings: &DatabaseSettings,
+    migration: Option<EmbeddedMigrations>,
+) {
     let mut db_conn = AsyncPgConnection::establish(
         db_settings
             .connection_string_without_database()
@@ -141,8 +144,13 @@ async fn configure_database(db_settings: &DatabaseSettings) {
                 conn_string.expose_secret(),
             )
             .expect("Error");
-        tokio::task::block_in_place(move || {
-            db_conn.run_pending_migrations(MIGRATION).unwrap();
+        tokio::task::block_in_place(move || match migration {
+            None => {
+                db_conn.run_pending_migrations(MIGRATION).unwrap();
+            }
+            Some(test_migration) => {
+                db_conn.run_pending_migrations(test_migration).unwrap();
+            }
         })
     })
     .await

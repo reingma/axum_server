@@ -1,3 +1,5 @@
+use diesel_migrations::embed_migrations;
+use diesel_migrations::EmbeddedMigrations;
 use wiremock::{
     matchers::{method, path},
     Mock, ResponseTemplate,
@@ -5,9 +7,12 @@ use wiremock::{
 
 use crate::helpers::spawn_app;
 
+const MIGRATION_FAIL: EmbeddedMigrations =
+    embed_migrations!("./test_migrations");
+
 #[tokio::test]
 async fn subscribe_returns_200_for_valid_form() {
-    let test_app = spawn_app().await;
+    let test_app = spawn_app(None).await;
 
     let body = "name=Gabriel%20Aguiar&email=gabriel.masarin.aguiar%40gmail.com";
 
@@ -26,7 +31,7 @@ async fn subscribe_returns_200_for_valid_form() {
 }
 #[tokio::test]
 async fn subscribe_persists_subcriber_data() {
-    let test_app = spawn_app().await;
+    let test_app = spawn_app(None).await;
 
     let body = "name=Gabriel%20Aguiar&email=gabriel.masarin.aguiar%40gmail.com";
 
@@ -57,7 +62,7 @@ async fn subscribe_persists_subcriber_data() {
 }
 #[tokio::test]
 async fn subscribe_returns_422_when_data_is_missing() {
-    let test_app = spawn_app().await;
+    let test_app = spawn_app(None).await;
 
     let test_cases = vec![
         ("name=Gabriel%20Aguiar", "missing email"),
@@ -81,7 +86,7 @@ async fn subscribe_returns_422_when_data_is_missing() {
 }
 #[tokio::test]
 async fn subscribe_returns_400_when_fields_are_present_but_empty() {
-    let test_app = spawn_app().await;
+    let test_app = spawn_app(None).await;
 
     let test_cases = vec![
         (
@@ -108,7 +113,7 @@ async fn subscribe_returns_400_when_fields_are_present_but_empty() {
 }
 #[tokio::test]
 async fn subscribe_sends_a_confirmation_email_for_valid_sub() {
-    let test_app = spawn_app().await;
+    let test_app = spawn_app(None).await;
 
     let body = "name=Gabriel%20Aguiar&email=gabriel.masarin.aguiar%40gmail.com";
 
@@ -129,7 +134,7 @@ async fn subscribe_sends_a_confirmation_email_for_valid_sub() {
 
 #[tokio::test]
 async fn subscribe_sends_a_confirmation_email_with_a_link() {
-    let test_app = spawn_app().await;
+    let test_app = spawn_app(None).await;
 
     let body = "name=Gabriel%20Aguiar&email=gabriel.masarin.aguiar%40gmail.com";
 
@@ -152,4 +157,14 @@ async fn subscribe_sends_a_confirmation_email_with_a_link() {
         confirmation_links.html.as_str(),
         confirmation_links.plain_text.as_str()
     );
+}
+
+#[tokio::test]
+async fn subscriber_fails_when_a_fatal_database_error_occurs() {
+    let test_app = spawn_app(Some(MIGRATION_FAIL)).await;
+
+    let body = "name=Gabriel%20Aguiar&email=gabriel.masarin.aguiar%40gmail.com";
+
+    let response = test_app.subscribe(body.into()).await.unwrap();
+    assert_eq!(response.status().as_u16(), 500);
 }
