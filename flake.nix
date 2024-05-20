@@ -35,6 +35,7 @@
                 pkgs.mold
                 rust
                 diesel
+                pkgs.clang
               ];
             };
           matrix = {

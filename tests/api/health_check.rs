@@ -2,7 +2,7 @@ use crate::helpers::spawn_app;
 
 #[tokio::test]
 async fn health_check_responds_ok() {
-    let test_app = spawn_app().await;
+    let test_app = spawn_app(None).await;
     let response = test_app
         .check_health()
         .await

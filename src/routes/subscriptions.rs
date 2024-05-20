@@ -6,9 +6,11 @@ use crate::{
     domain::NewSubscriber, email_client::send::send_confirmation_email,
     startup::ApplicationState,
 };
+use axum::response::IntoResponse;
 use axum::{extract::State, http::StatusCode, Form};
 use diesel_async::scoped_futures::ScopedFutureExt;
 use diesel_async::AsyncConnection;
+use serde::Serialize;
 
 #[derive(serde::Deserialize)]
 pub struct Subscriber {
@@ -27,10 +29,10 @@ pub struct Subscriber {
 pub async fn subscriptions(
     State(app_state): State<ApplicationState>,
     Form(subscriber): Form<Subscriber>,
-) -> StatusCode {
+) -> Result<StatusCode, SubscriptionError> {
     let new_subscriber: NewSubscriber = match subscriber.try_into() {
         Ok(new_subscriber) => new_subscriber,
-        Err(_) => return StatusCode::BAD_REQUEST,
+        Err(e) => return Err(SubscriptionError::InvalidSubscriberData(e)),
     };
     tracing::info!("Adding a new subscriber to the database.");
 
@@ -38,7 +40,7 @@ pub async fn subscriptions(
         crate::database::get_connection(app_state.database_pool).await;
 
     let subscription_token = Arc::new(SubscriptionToken::generate());
-    if connection
+    match connection
         .transaction::<_, diesel::result::Error, _>(|conn| {
             async move {
                 let subscriber_id =
@@ -57,7 +59,7 @@ pub async fn subscriptions(
                     Ok(_) => Ok(()),
                     Err(e) => {
                         tracing::error!(
-                            "Could not send Email with reason {:?}",
+                            "Subscription transaction failed. Could not send Email with reason {:?}",
                             e
                         );
                         Err(diesel::result::Error::RollbackTransaction)
@@ -67,10 +69,55 @@ pub async fn subscriptions(
             .scope_boxed()
         })
         .await
-        .is_err()
     {
-        return StatusCode::INTERNAL_SERVER_ERROR;
+        Ok(()) => return Ok(StatusCode::OK),
+        Err(e) => match e {
+            diesel::result::Error::RollbackTransaction => {
+                return Err(SubscriptionError::ConfirmationEmailError(
+                    "Could not send Email.".to_string(),
+                ))
+            }
+            _ => return Err(e.into()),
+        },
     }
+}
 
-    return StatusCode::OK;
+pub enum SubscriptionError {
+    InsertSubscriberError(diesel::result::Error),
+    InvalidSubscriberData(String),
+    ConfirmationEmailError(String),
+}
+
+impl IntoResponse for SubscriptionError {
+    fn into_response(self) -> axum::response::Response {
+        #[derive(Serialize)]
+        struct SubscriberErrorResponse {
+            message: String,
+        }
+        let (status, message) = match self {
+            SubscriptionError::InvalidSubscriberData(message) => {
+                (StatusCode::BAD_REQUEST, message)
+            }
+            SubscriptionError::ConfirmationEmailError(message) => {
+                (StatusCode::INTERNAL_SERVER_ERROR, message)
+            }
+            SubscriptionError::InsertSubscriberError(_e) => {
+                tracing::error!(
+                    "Failed when storing subscriber data into the database."
+                );
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Something went wrong".to_string(),
+                )
+            }
+        };
+        (status, axum::Json(SubscriberErrorResponse { message }))
+            .into_response()
+    }
+}
+
+impl From<diesel::result::Error> for SubscriptionError {
+    fn from(value: diesel::result::Error) -> Self {
+        Self::InsertSubscriberError(value)
+    }
 }
