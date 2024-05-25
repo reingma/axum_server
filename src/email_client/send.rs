@@ -14,7 +14,7 @@ pub async fn send_confirmation_email(
     new_subscriber: NewSubscriber,
     base_url: &str,
     token: &SubscriptionToken,
-) -> Result<(), String> {
+) -> Result<(), SendEmailError> {
     let confirmation_link = format!(
         "{}/subscriptions/confirm?subscription_token={}",
         base_url,
@@ -22,12 +22,8 @@ pub async fn send_confirmation_email(
     );
     let mut tera_context = tera::Context::new();
     tera_context.insert("link", &confirmation_link);
-    let html_body = TEMPLATES
-        .render("emails/subscription_email.html", &tera_context)
-        .map_err(|e| {
-            format!("Could not render email html with error: {:?}", e)
-        })?;
-    tracing::info!("Email sent to subscriber.");
+    let html_body =
+        TEMPLATES.render("emails/subscription_email.html", &tera_context)?;
     let plain_text_body = format!("Welcome to reingma's newsletter!\nVisit {} to confirm your subscription.",
                         confirmation_link);
     email_client
@@ -37,5 +33,15 @@ pub async fn send_confirmation_email(
             &html_body,
             "Welcome to reingma's newsletter!",
         )
-        .await
+        .await?;
+
+    tracing::info!("Email sent to subscriber.");
+    Ok(())
+}
+#[derive(Debug, thiserror::Error)]
+pub enum SendEmailError {
+    #[error("Could not render email template.")]
+    TemplateRenderError(#[from] tera::Error),
+    #[error("Could not deliver email.")]
+    DeliveryError(#[from] reqwest::Error),
 }
