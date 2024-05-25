@@ -6,6 +6,7 @@ use crate::{
     domain::NewSubscriber, email_client::send::send_confirmation_email,
     startup::ApplicationState,
 };
+use anyhow::Context;
 use axum::response::IntoResponse;
 use axum::{extract::State, http::StatusCode, Form};
 use diesel_async::scoped_futures::ScopedFutureExt;
@@ -30,62 +31,49 @@ pub async fn subscriptions(
     State(app_state): State<ApplicationState>,
     Form(subscriber): Form<Subscriber>,
 ) -> Result<StatusCode, SubscriptionError> {
-    let new_subscriber: NewSubscriber = match subscriber.try_into() {
-        Ok(new_subscriber) => new_subscriber,
-        Err(e) => return Err(SubscriptionError::InvalidSubscriberData(e)),
-    };
+    let new_subscriber: NewSubscriber = subscriber
+        .try_into()
+        .map_err(SubscriptionError::InvalidSubscriberData)?;
     tracing::info!("Adding a new subscriber to the database.");
 
     let mut connection =
         crate::database::get_connection(app_state.database_pool).await;
 
     let subscription_token = Arc::new(SubscriptionToken::generate());
-    match connection
-        .transaction::<_, diesel::result::Error, _>(|conn| {
+    connection
+        .transaction::<_, SubscriptionError, _>(|conn| {
             async move {
-                let subscriber_id =
-                    insert_subscriber(conn, &new_subscriber).await?;
+                let subscriber_id = insert_subscriber(conn, &new_subscriber)
+                    .await
+                    .context("Failed to insert subscriber.")?;
 
                 queries::store_token(conn, &subscription_token, &subscriber_id)
-                    .await?;
-                match send_confirmation_email(
+                    .await
+                    .context("Failed to store token.")?;
+                send_confirmation_email(
                     &app_state.email_client,
                     new_subscriber,
                     &app_state.base_url,
                     &subscription_token,
                 )
                 .await
-                {
-                    Ok(_) => Ok(()),
-                    Err(e) => {
-                        tracing::error!(
-                            "Subscription transaction failed. Could not send Email with reason {:?}",
-                            e
-                        );
-                        Err(diesel::result::Error::RollbackTransaction)
-                    }
-                }
+                .context("Failed to send confirmation email.")?;
+                Ok(())
             }
             .scope_boxed()
         })
-        .await
-    {
-        Ok(()) => return Ok(StatusCode::OK),
-        Err(e) => match e {
-            diesel::result::Error::RollbackTransaction => {
-                return Err(SubscriptionError::ConfirmationEmailError(
-                    "Could not send Email.".to_string(),
-                ))
-            }
-            _ => return Err(e.into()),
-        },
-    }
+        .await?;
+    Ok(StatusCode::OK)
 }
 
+#[derive(thiserror::Error, Debug)]
 pub enum SubscriptionError {
-    InsertSubscriberError(diesel::result::Error),
+    #[error("{0}")]
     InvalidSubscriberData(String),
-    ConfirmationEmailError(String),
+    #[error(transparent)]
+    UnexpectedError(#[from] anyhow::Error),
+    #[error("Unkown database error.")]
+    DatabaseError(#[from] diesel::result::Error),
 }
 
 impl IntoResponse for SubscriptionError {
@@ -94,30 +82,17 @@ impl IntoResponse for SubscriptionError {
         struct SubscriberErrorResponse {
             message: String,
         }
+        tracing::error!("{} Reason: {:?}", self, self);
         let (status, message) = match self {
             SubscriptionError::InvalidSubscriberData(message) => {
                 (StatusCode::BAD_REQUEST, message)
             }
-            SubscriptionError::ConfirmationEmailError(message) => {
-                (StatusCode::INTERNAL_SERVER_ERROR, message)
-            }
-            SubscriptionError::InsertSubscriberError(_e) => {
-                tracing::error!(
-                    "Failed when storing subscriber data into the database."
-                );
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "Something went wrong".to_string(),
-                )
-            }
+            _ => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Something went wrong".to_string(),
+            ),
         };
         (status, axum::Json(SubscriberErrorResponse { message }))
             .into_response()
-    }
-}
-
-impl From<diesel::result::Error> for SubscriptionError {
-    fn from(value: diesel::result::Error) -> Self {
-        Self::InsertSubscriberError(value)
     }
 }

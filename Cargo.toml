@@ -14,6 +14,8 @@ default-features = false
 features = ["json", "rustls-tls"]
 
 [dependencies]
+thiserror = "1"
+anyhow = "1"
 axum = "0.7.4"
 axum-macros = "0.4.1"
 chrono = "0.4.34"

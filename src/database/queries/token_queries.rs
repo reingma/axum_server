@@ -6,7 +6,6 @@ use crate::{
 };
 use chrono::{Duration, Utc};
 use diesel::prelude::*;
-use diesel::result::Error;
 use diesel::SelectableHelper;
 use diesel_async::RunQueryDsl;
 use schema::subscription_tokens::dsl::*;
@@ -21,23 +20,15 @@ pub async fn store_token(
     connection: &mut DatabaseConnection,
     subscriber_token: &SubscriptionToken,
     sub_id: &Uuid,
-) -> Result<(), Error> {
+) -> Result<(), diesel::result::Error> {
     let token_entry =
         SubscriptionTokens::new(subscriber_token.as_ref(), sub_id);
-    match diesel::insert_into(schema::subscription_tokens::table)
+    diesel::insert_into(schema::subscription_tokens::table)
         .values(&token_entry)
         .execute(connection)
-        .await
-    {
-        Ok(_) => {
-            tracing::info!("New subscriber details have been saved");
-            Ok(())
-        }
-        Err(e) => {
-            tracing::error!("Failed to execute query {:?}", e);
-            return Err(e);
-        }
-    }
+        .await?;
+    tracing::info!("New subscriber details have been saved");
+    Ok(())
 }
 
 #[tracing::instrument(
@@ -57,11 +48,7 @@ pub async fn get_subscriber_id_for_token(
         .select(SubscriptionTokens::as_select())
         .first(connection)
         .await
-        .optional()
-        .map_err(|e| {
-            tracing::error!("Failed to execute query {:?}", e);
-            e
-        })?;
+        .optional()?;
     let value = match subscriber {
         Some(sub) => Some(sub.subscriber_id),
         None => None,
@@ -74,15 +61,9 @@ pub async fn confirm_subscriber(
     connection: &mut DatabaseConnection,
     sub_id: &Uuid,
 ) -> Result<(), diesel::result::Error> {
-    match diesel::update(subscriptions::table.find(sub_id))
+    diesel::update(subscriptions::table.find(sub_id))
         .set(status.eq("confirmed"))
         .execute(connection)
-        .await
-    {
-        Ok(_) => Ok(()),
-        Err(e) => {
-            tracing::error!("Failed to execute query {:?}", e);
-            Err(e)
-        }
-    }
+        .await?;
+    Ok(())
 }

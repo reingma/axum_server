@@ -9,7 +9,7 @@ pub struct EmailClient {
     api_token: Secret<String>,
     sender: SubscriberEmail,
     http_client: Client,
-    base_url: reqwest::Url,
+    base_url: String,
 }
 
 impl EmailClient {
@@ -21,7 +21,7 @@ impl EmailClient {
     ) -> Self {
         let http_client = Client::builder().timeout(timeout).build().unwrap();
         Self {
-            base_url: reqwest::Url::try_from(base_url).expect("Invalid url!"),
+            base_url: base_url.to_string(),
             sender,
             http_client,
             api_token,
@@ -33,9 +33,8 @@ impl EmailClient {
         text_content: &str,
         html_content: &str,
         subject: &str,
-    ) -> Result<(), String> {
-        let url = reqwest::Url::join(&self.base_url, "/email")
-            .map_err(|_| "Invalid uri")?;
+    ) -> Result<(), reqwest::Error> {
+        let url = format!("{}/email", &self.base_url);
         let request_body = SendEmailRequest {
             from: self.sender.as_ref(),
             to: recipient.as_ref(),
@@ -50,10 +49,8 @@ impl EmailClient {
             .header("X-Postmark-Server-Token", self.api_token.expose_secret())
             .json(&request_body)
             .send()
-            .await
-            .map_err(|_| "Could not send request")?
-            .error_for_status()
-            .map_err(|_| "Server error")?;
+            .await?
+            .error_for_status()?;
         Ok(())
     }
 }
