@@ -76,6 +76,9 @@
                 name = rustInfo.name;
                 RUST_SRC_PATH = rustInfo.path;
                 buildInputs = rustInfo.drvs;
+                shellHook = ''
+                  ./scripts/init_db.sh
+                '';
               };
             };
 

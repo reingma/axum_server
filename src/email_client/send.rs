@@ -28,7 +28,7 @@ pub async fn send_confirmation_email(
                         confirmation_link);
     email_client
         .send_email(
-            new_subscriber.email,
+            &new_subscriber.email,
             &plain_text_body,
             &html_body,
             "Welcome to reingma's newsletter!",

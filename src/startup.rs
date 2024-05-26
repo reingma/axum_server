@@ -27,6 +27,7 @@ pub fn run(
         .route("/health_check", routing::get(routes::health_check))
         .route("/subscriptions", routing::post(routes::subscriptions))
         .route("/subscriptions/confirm", routing::get(routes::confirm))
+        .route("/newsletters", routing::post(routes::publish_newsletter))
         .layer(TraceLayer::new_for_http().make_span_with(
             |request: &Request<_>| {
                 let request_id = Uuid::now_v7();

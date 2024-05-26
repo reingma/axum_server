@@ -89,6 +89,18 @@ impl TestApp {
         let plain_text = get_link(body["TextBody"].as_str().unwrap());
         ConfirmationLinks { html, plain_text }
     }
+
+    pub async fn post_newsletter(
+        &self,
+        body: serde_json::Value,
+    ) -> reqwest::Response {
+        reqwest::Client::new()
+            .post(&format!("{}/newsletters", &self.address))
+            .json(&body)
+            .send()
+            .await
+            .expect("Request failed.")
+    }
 }
 pub async fn spawn_app(migration: Option<EmbeddedMigrations>) -> TestApp {
     Lazy::force(&TRACING);
