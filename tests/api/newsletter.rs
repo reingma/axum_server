@@ -147,3 +147,27 @@ async fn newsletter_returns_200_on_valid_data() {
 
     assert_eq!(response.status().as_u16(), 200)
 }
+
+#[tokio::test]
+async fn newsletter_requests_missing_authorization_are_rejected() {
+    let app = spawn_app(None).await;
+    let body = serde_json::json!({
+        "content": {
+            "text": "Body as plain text",
+            "html": "<p> Body as html </p>"
+        },
+        "title": "Newsletter"
+    });
+    let response = reqwest::Client::new()
+        .post(&format!("{}/newsletters", &app.address))
+        .json(&body)
+        .send()
+        .await
+        .expect("Failed to send request");
+
+    assert_eq!(response.status().as_u16(), 401);
+    assert_eq!(
+        response.headers()["WWW-Authenticate"],
+        r#"Basic realm="publish""#
+    );
+}

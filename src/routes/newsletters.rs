@@ -1,5 +1,12 @@
 use anyhow::Context;
-use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
+use axum::{
+    extract::State,
+    http::{HeaderMap, Response, StatusCode},
+    response::IntoResponse,
+    Json,
+};
+use base64::Engine;
+use secrecy::Secret;
 
 use crate::{
     database::queries::get_confirmed_subscribers, startup::ApplicationState,
@@ -7,10 +14,13 @@ use crate::{
 
 pub async fn publish_newsletter(
     State(app_state): State<ApplicationState>,
+    headers: HeaderMap,
     body: Json<BodyData>,
 ) -> Result<StatusCode, PublishNewsletterError> {
     let mut connection =
         crate::database::get_connection(app_state.database_pool).await;
+    let credentials = basic_authentication(headers)
+        .map_err(PublishNewsletterError::AuthError)?;
     let subscribers = get_confirmed_subscribers(&mut connection)
         .await
         .context("Could not get confirmed subscribers")?;
@@ -44,6 +54,46 @@ pub async fn publish_newsletter(
     }
     Ok(StatusCode::OK)
 }
+struct Credentials {
+    username: String,
+    password: Secret<String>,
+}
+
+fn basic_authentication(
+    headers: HeaderMap,
+) -> Result<Credentials, anyhow::Error> {
+    let header_value = headers
+        .get("Authorization")
+        .context("The 'Authorization' header was missing")?
+        .to_str()
+        .context("The 'Authorization' header was not a valid UTF8 string")?;
+    let base64segment = header_value
+        .strip_prefix("Basic ")
+        .context("Scheme was not 'Basic'.")?;
+    let decoded_bytes = base64::engine::general_purpose::STANDARD
+        .decode(base64segment)
+        .context("Failed to base64-decode 'Basic' credentials")?;
+    let decoded_credentials = String::from_utf8(decoded_bytes)
+        .context("The decoded credential string is not valid utf8")?;
+    let mut credentials = decoded_credentials.splitn(2, ':');
+    let username = credentials
+        .next()
+        .ok_or_else(|| {
+            anyhow::anyhow!("A username must be provided in 'Basic' auth.")
+        })?
+        .to_string();
+    let password = credentials
+        .next()
+        .ok_or_else(|| {
+            anyhow::anyhow!("A password must be provided in 'Basic' auth.")
+        })?
+        .to_string();
+
+    Ok(Credentials {
+        username,
+        password: Secret::new(password),
+    })
+}
 
 #[derive(serde::Deserialize)]
 pub struct BodyData {
@@ -59,27 +109,28 @@ pub struct Content {
 
 #[derive(thiserror::Error, Debug)]
 pub enum PublishNewsletterError {
+    #[error("Authentication Failed")]
+    AuthError(#[source] anyhow::Error),
     #[error(transparent)]
     UnexpectedError(#[from] anyhow::Error),
 }
 
 impl IntoResponse for PublishNewsletterError {
     fn into_response(self) -> axum::response::Response {
-        #[derive(serde::Serialize)]
-        struct PublishNewsletterErrorResponse {
-            message: String,
-        }
         tracing::error!("{} Reason {:?}", self, self);
-        let (status, message) = match self {
-            PublishNewsletterError::UnexpectedError(_) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Something went wrong".to_string(),
-            ),
-        };
-        (
-            status,
-            axum::Json(PublishNewsletterErrorResponse { message }),
-        )
-            .into_response()
+        match self {
+            PublishNewsletterError::UnexpectedError(_) => Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body("Something went wrong.".into())
+                .unwrap(),
+            PublishNewsletterError::AuthError(_) => Response::builder()
+                .status(StatusCode::UNAUTHORIZED)
+                .header(
+                    axum::http::header::WWW_AUTHENTICATE,
+                    r#"Basic realm="publish""#,
+                )
+                .body("Unauthorized Access".into())
+                .unwrap(),
+        }
     }
 }
