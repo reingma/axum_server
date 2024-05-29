@@ -19,6 +19,7 @@ use rand::Rng;
 use reqwest::Client;
 use secrecy::ExposeSecret;
 use std::future::IntoFuture;
+use uuid::Uuid;
 use wiremock::MockServer;
 
 const MIGRATION: EmbeddedMigrations = embed_migrations!();
@@ -96,6 +97,7 @@ impl TestApp {
     ) -> reqwest::Response {
         reqwest::Client::new()
             .post(&format!("{}/newsletters", &self.address))
+            .basic_auth(Uuid::now_v7(), Some(Uuid::now_v7()))
             .json(&body)
             .send()
             .await
