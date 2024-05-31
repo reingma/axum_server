@@ -1,11 +1,12 @@
+use argon2::password_hash::SaltString;
+use argon2::Argon2;
+use argon2::PasswordHasher;
 use axum_newsletter::configuration::get_configuration;
 use axum_newsletter::configuration::DatabaseSettings;
 use axum_newsletter::database::DatabaseConnection;
 use axum_newsletter::models::Subscriptions;
 use axum_newsletter::models::Users;
 use axum_newsletter::schema::users;
-use axum_newsletter::schema::users::dsl::*;
-use axum_newsletter::schema::users::username;
 use axum_newsletter::telemetry::setup_tracing;
 use diesel::prelude::*;
 use diesel::SelectableHelper;
@@ -22,7 +23,6 @@ use rand::thread_rng;
 use rand::Rng;
 use reqwest::Client;
 use secrecy::ExposeSecret;
-use sha3::Digest;
 use std::future::IntoFuture;
 use uuid::Uuid;
 use wiremock::MockServer;
@@ -53,10 +53,13 @@ impl TestUser {
         }
     }
     pub async fn store(&self, connection: &mut DatabaseConnection) {
-        let hash = sha3::Sha3_256::digest(self.password.as_bytes());
-        let hash = format!("{:x}", hash);
+        let salt = SaltString::generate(&mut rand::thread_rng());
+        let hash = Argon2::default()
+            .hash_password(self.password.as_bytes(), &salt)
+            .unwrap()
+            .to_string();
 
-        let user = Users::new(self.user_id.clone(), &self.username, &hash);
+        let user = Users::new(self.user_id, &self.username, &hash);
         diesel::insert_into(users::table)
             .values(&user)
             .execute(connection)
@@ -197,7 +200,7 @@ async fn configure_database(
         .await
         .expect("Failed to create database");
     let conn_string = db_settings.connection_string().clone();
-    tokio::task::spawn_blocking(move || {
+    axum_newsletter::telemetry::spawn_blocking_with_tracing(move || {
         let mut db_conn: AsyncConnectionWrapper<AsyncPgConnection> =
             AsyncConnectionWrapper::<AsyncPgConnection>::establish(
                 conn_string.expose_secret(),

@@ -1,4 +1,12 @@
+use crate::database::DatabaseConnection;
+use crate::{
+    database::queries::{get_confirmed_subscribers, get_stored_credentials},
+    startup::ApplicationState,
+};
 use anyhow::Context;
+use argon2::Argon2;
+use argon2::PasswordHash;
+use argon2::PasswordVerifier;
 use axum::{
     extract::State,
     http::{HeaderMap, Response, StatusCode},
@@ -6,14 +14,8 @@ use axum::{
     Json,
 };
 use base64::Engine;
+use secrecy::ExposeSecret;
 use secrecy::Secret;
-
-use crate::{
-    database::queries::{
-        get_confirmed_subscribers, validate_credentials, ValidateUserError,
-    },
-    startup::ApplicationState,
-};
 
 #[tracing::instrument(
     name = "Publish a newsletter issue",
@@ -31,21 +33,7 @@ pub async fn publish_newsletter(
         .map_err(PublishNewsletterError::AuthError)?;
     tracing::Span::current()
         .record("username", &tracing::field::display(&credentials.username));
-    let valid_id = match validate_credentials(&credentials, &mut connection)
-        .await
-    {
-        Ok(valid_id) => valid_id,
-        Err(error) => match error {
-            ValidateUserError::DatabaseError(e) => {
-                return Err(PublishNewsletterError::UnexpectedError(e.into()))
-            }
-            ValidateUserError::AuthenticationError(message) => {
-                return Err(PublishNewsletterError::AuthError(anyhow::anyhow!(
-                    message
-                )))
-            }
-        },
-    };
+    let valid_id = validate_credentials(credentials, &mut connection).await?;
     tracing::Span::current()
         .record("user_id", &tracing::field::display(&valid_id));
     let subscribers = get_confirmed_subscribers(&mut connection)
@@ -121,6 +109,48 @@ fn basic_authentication(
         username,
         password: Secret::new(password),
     })
+}
+
+#[tracing::instrument(
+    name = "Validate Credentials",
+    skip(connection, credentials)
+)]
+pub async fn validate_credentials(
+    credentials: Credentials,
+    connection: &mut DatabaseConnection,
+) -> Result<uuid::Uuid, anyhow::Error> {
+    let (stored_user_id, expected_hash) =
+        get_stored_credentials(&credentials.username, connection).await?;
+    crate::telemetry::spawn_blocking_with_tracing(move || {
+        verify_password_hash(expected_hash, credentials.password)
+    })
+    .await
+    .context("Failed to spawn blocking task.")
+    .map_err(PublishNewsletterError::UnexpectedError)??;
+
+    Ok(stored_user_id)
+}
+
+#[tracing::instrument(
+    name = "Verify password hash",
+    skip(expected_password_hash, password_candidate)
+)]
+fn verify_password_hash(
+    expected_password_hash: Secret<String>,
+    password_candidate: Secret<String>,
+) -> Result<(), PublishNewsletterError> {
+    let expected_hash =
+        PasswordHash::new(expected_password_hash.expose_secret())
+            .context("Failed to parse hash in PHC format.")
+            .map_err(PublishNewsletterError::UnexpectedError)?;
+    Argon2::default()
+        .verify_password(
+            password_candidate.expose_secret().as_bytes(),
+            &expected_hash,
+        )
+        .context("Invalid password.")
+        .map_err(PublishNewsletterError::AuthError)?;
+    Ok(())
 }
 
 #[derive(serde::Deserialize)]

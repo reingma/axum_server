@@ -1,12 +1,10 @@
 use crate::database::DatabaseConnection;
 use crate::domain::SubscriberEmail;
-use crate::routes::Credentials;
 use crate::schema::subscriptions::dsl::*;
 use crate::schema::users::dsl::*;
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
-use secrecy::ExposeSecret;
-use sha3::Digest;
+use secrecy::Secret;
 
 pub struct ConfirmedSubscriber {
     pub confirmed_email: SubscriberEmail,
@@ -35,28 +33,27 @@ pub async fn get_confirmed_subscribers(
     Ok(confirmed_subscribers)
 }
 
-pub async fn validate_credentials(
-    credentials: &Credentials,
+#[tracing::instrument(
+    name = "Retrieve stored credentials",
+    skip(uname, connection)
+)]
+pub async fn get_stored_credentials(
+    uname: &str,
     connection: &mut DatabaseConnection,
-) -> Result<uuid::Uuid, ValidateUserError> {
-    let hash =
-        sha3::Sha3_256::digest(credentials.password.expose_secret().as_bytes());
-    let hash = format!("{:x}", hash);
-    let validated_id: Option<uuid::Uuid> = users
-        .filter(
-            username
-                .eq(&credentials.username)
-                .and(password_hash.eq(hash)),
-        )
-        .select(user_id)
+) -> Result<(uuid::Uuid, Secret<String>), ValidateUserError> {
+    let row: Option<(uuid::Uuid, String)> = users
+        .filter(username.eq(&uname))
+        .select((user_id, password_hash))
         .first(connection)
         .await
         .optional()?;
-
-    validated_id.ok_or_else(|| {
-        ValidateUserError::AuthenticationError(
-            "Invalid username or password".into(),
-        )
+    Ok(match row {
+        Some(row) => (row.0, Secret::new(row.1)),
+        None => {
+            return Err(ValidateUserError::AuthenticationError(
+                "Unknown username".into(),
+            ));
+        }
     })
 }
 
