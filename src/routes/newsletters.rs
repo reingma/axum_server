@@ -9,9 +9,17 @@ use base64::Engine;
 use secrecy::Secret;
 
 use crate::{
-    database::queries::get_confirmed_subscribers, startup::ApplicationState,
+    database::queries::{
+        get_confirmed_subscribers, validate_credentials, ValidateUserError,
+    },
+    startup::ApplicationState,
 };
 
+#[tracing::instrument(
+    name = "Publish a newsletter issue",
+    skip(app_state, body, headers),
+    fields(username=tracing::field::Empty, user_id=tracing::field::Empty)
+)]
 pub async fn publish_newsletter(
     State(app_state): State<ApplicationState>,
     headers: HeaderMap,
@@ -21,6 +29,25 @@ pub async fn publish_newsletter(
         crate::database::get_connection(app_state.database_pool).await;
     let credentials = basic_authentication(headers)
         .map_err(PublishNewsletterError::AuthError)?;
+    tracing::Span::current()
+        .record("username", &tracing::field::display(&credentials.username));
+    let valid_id = match validate_credentials(&credentials, &mut connection)
+        .await
+    {
+        Ok(valid_id) => valid_id,
+        Err(error) => match error {
+            ValidateUserError::DatabaseError(e) => {
+                return Err(PublishNewsletterError::UnexpectedError(e.into()))
+            }
+            ValidateUserError::AuthenticationError(message) => {
+                return Err(PublishNewsletterError::AuthError(anyhow::anyhow!(
+                    message
+                )))
+            }
+        },
+    };
+    tracing::Span::current()
+        .record("user_id", &tracing::field::display(&valid_id));
     let subscribers = get_confirmed_subscribers(&mut connection)
         .await
         .context("Could not get confirmed subscribers")?;
@@ -52,11 +79,12 @@ pub async fn publish_newsletter(
             }
         }
     }
+    tracing::info!("Email delivered to subscribers.");
     Ok(StatusCode::OK)
 }
-struct Credentials {
-    username: String,
-    password: Secret<String>,
+pub struct Credentials {
+    pub username: String,
+    pub password: Secret<String>,
 }
 
 fn basic_authentication(
