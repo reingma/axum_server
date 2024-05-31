@@ -2,6 +2,10 @@ use axum_newsletter::configuration::get_configuration;
 use axum_newsletter::configuration::DatabaseSettings;
 use axum_newsletter::database::DatabaseConnection;
 use axum_newsletter::models::Subscriptions;
+use axum_newsletter::models::Users;
+use axum_newsletter::schema::users;
+use axum_newsletter::schema::users::dsl::*;
+use axum_newsletter::schema::users::username;
 use axum_newsletter::telemetry::setup_tracing;
 use diesel::prelude::*;
 use diesel::SelectableHelper;
@@ -18,6 +22,7 @@ use rand::thread_rng;
 use rand::Rng;
 use reqwest::Client;
 use secrecy::ExposeSecret;
+use sha3::Digest;
 use std::future::IntoFuture;
 use uuid::Uuid;
 use wiremock::MockServer;
@@ -33,6 +38,37 @@ static TRACING: Lazy<()> = Lazy::new(|| {
     }
 });
 
+pub struct TestUser {
+    pub user_id: Uuid,
+    pub username: String,
+    pub password: String,
+}
+
+impl TestUser {
+    pub fn generate() -> Self {
+        Self {
+            user_id: Uuid::now_v7(),
+            username: Uuid::now_v7().to_string(),
+            password: Uuid::now_v7().to_string(),
+        }
+    }
+    pub async fn store(&self, connection: &mut DatabaseConnection) {
+        let hash = sha3::Sha3_256::digest(self.password.as_bytes());
+        let hash = format!("{:x}", hash);
+
+        let user = Users::new(self.user_id.clone(), &self.username, &hash);
+        diesel::insert_into(users::table)
+            .values(&user)
+            .execute(connection)
+            .await
+            .expect("Failed to add user");
+    }
+
+    pub fn get_credentials(&self) -> (&str, &str) {
+        (&self.username, &self.password)
+    }
+}
+
 pub struct ConfirmationLinks {
     pub html: reqwest::Url,
     pub plain_text: reqwest::Url,
@@ -43,6 +79,7 @@ pub struct TestApp {
     pub pool: Pool<AsyncPgConnection>,
     pub email_server: MockServer,
     pub server_port: u16,
+    pub test_user: TestUser,
 }
 
 impl TestApp {
@@ -95,9 +132,10 @@ impl TestApp {
         &self,
         body: serde_json::Value,
     ) -> reqwest::Response {
+        let (uname, pword) = self.test_user.get_credentials();
         reqwest::Client::new()
             .post(&format!("{}/newsletters", &self.address))
-            .basic_auth(Uuid::now_v7(), Some(Uuid::now_v7()))
+            .basic_auth(uname, Some(pword))
             .json(&body)
             .send()
             .await
@@ -127,7 +165,14 @@ pub async fn spawn_app(migration: Option<EmbeddedMigrations>) -> TestApp {
         pool: application.pool(),
         email_server,
         server_port: application.port(),
+        test_user: TestUser::generate(),
     };
+    let mut connection = testapp
+        .pool
+        .get()
+        .await
+        .expect("Could not retrieve database connection");
+    testapp.test_user.store(&mut connection).await;
     tokio::spawn(application.run_until_stopped().into_future());
     testapp
 }

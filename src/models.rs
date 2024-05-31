@@ -43,3 +43,22 @@ impl SubscriptionTokens {
         }
     }
 }
+
+#[derive(Insertable, Queryable, Selectable)]
+#[diesel(table_name = crate::schema::users)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct Users {
+    pub user_id: Uuid,
+    pub username: String,
+    pub password_hash: String,
+}
+
+impl Users {
+    pub fn new(user_id: Uuid, username: &str, password_hash: &str) -> Self {
+        Self {
+            user_id,
+            username: username.to_string(),
+            password_hash: password_hash.to_string(),
+        }
+    }
+}
