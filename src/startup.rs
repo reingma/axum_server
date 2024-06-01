@@ -4,6 +4,7 @@ use axum::response::Response;
 use axum::{extract::Request, routing, serve::Serve, Router};
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
 use secrecy::ExposeSecret;
+use secrecy::Secret;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::TcpListener;
@@ -16,18 +17,22 @@ pub fn run(
     connection_pool: Pool<AsyncPgConnection>,
     email_client: Arc<EmailClient>,
     base_url: String,
+    hmac_secret: Secret<String>,
 ) -> Serve<Router, Router> {
     let app_state = ApplicationState {
         database_pool: connection_pool,
         email_client,
         base_url,
+        secret: HmacSecret(hmac_secret),
     };
     let app: Router = Router::new()
-        .route("/", routing::get(routes::greet))
+        .route("/", routing::get(routes::home))
         .route("/health_check", routing::get(routes::health_check))
         .route("/subscriptions", routing::post(routes::subscriptions))
         .route("/subscriptions/confirm", routing::get(routes::confirm))
         .route("/newsletters", routing::post(routes::publish_newsletter))
+        .route("/login", routing::get(routes::login_form))
+        .route("/login", routing::post(routes::login))
         .layer(TraceLayer::new_for_http().make_span_with(
             |request: &Request<_>| {
                 let request_id = Uuid::now_v7();
@@ -46,6 +51,7 @@ pub struct ApplicationState {
     pub database_pool: DatabaseConnectionPool,
     pub email_client: Arc<EmailClient>,
     pub base_url: String,
+    pub secret: HmacSecret,
 }
 
 pub struct Application {
@@ -53,6 +59,9 @@ pub struct Application {
     pool: Pool<AsyncPgConnection>,
     server: Serve<Router, Router>,
 }
+
+#[derive(Clone)]
+pub struct HmacSecret(pub Secret<String>);
 
 impl Application {
     pub async fn build(
@@ -90,6 +99,7 @@ impl Application {
                 pool,
                 Arc::new(email_client),
                 configuration.application.base_url,
+                configuration.application.hmac_secret,
             ),
             port,
         })

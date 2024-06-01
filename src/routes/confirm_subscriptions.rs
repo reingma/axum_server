@@ -24,7 +24,9 @@ pub async fn confirm(
     parameters: Query<Parameters>,
     State(database_pool): State<DatabaseConnectionPool>,
 ) -> Result<StatusCode, ConfirmationError> {
-    let mut connection = crate::database::get_connection(database_pool).await;
+    let mut connection = crate::database::get_connection(database_pool)
+        .await
+        .context("Failed to get database pool.")?;
     let subscriber_id = get_subscriber_id_for_token(
         &mut connection,
         &parameters.subscription_token,

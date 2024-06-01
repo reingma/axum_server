@@ -1,9 +1,9 @@
 application:
-  host: 127.0.0.1
+  host: "127.0.0.1"
   base_url: "http://127.0.0.1"
 database:
-  require_ssl: prefer
+  require_ssl: "prefer"
 email_client:
-  base_url: http://localhost
-  sender_email: test@gmail.com
-  api_token: very-secret-token
+  base_url: "http://localhost"
+  sender_email: "test@gmail.com"
+  api_token:  "very-secret-token"
