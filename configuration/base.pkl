@@ -1,5 +1,6 @@
 application { 
     port = 8000
+    hmac_secret = "8aa152855fbb8df14508d9c22c000a8f"
 }
 database {
     host = "127.0.0.1"

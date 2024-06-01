@@ -1,5 +1,5 @@
 use axum::extract::FromRef;
-use diesel_async::pooled_connection::deadpool::Pool;
+use diesel_async::pooled_connection::deadpool::{Pool, PoolError};
 use diesel_async::{pooled_connection::deadpool::Object, AsyncPgConnection};
 
 pub mod diesel_configuration;
@@ -14,18 +14,18 @@ pub type DatabaseConnectionPool = Pool<AsyncPgConnection>;
 )]
 pub async fn get_connection(
     pool: Pool<AsyncPgConnection>,
-) -> DatabaseConnection {
+) -> Result<DatabaseConnection, PoolError> {
     match pool.get().await {
         Ok(conn) => {
             tracing::info!("Connection established.");
-            conn
+            Ok(conn)
         }
         Err(e) => {
             tracing::error!(
                 "Could not get connection from pool, with error: {:?}",
                 e
             );
-            panic!("Failed to establish connection.");
+            Err(e)
         }
     }
 }

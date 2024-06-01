@@ -37,7 +37,9 @@ pub async fn subscriptions(
     tracing::info!("Adding a new subscriber to the database.");
 
     let mut connection =
-        crate::database::get_connection(app_state.database_pool).await;
+        crate::database::get_connection(app_state.database_pool)
+            .await
+            .context("Could not get connection from pool.")?;
 
     let subscription_token = Arc::new(SubscriptionToken::generate());
     connection

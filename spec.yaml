@@ -37,6 +37,9 @@ services:
        - key: APP_DATABASE__REQUIRE_SSL
          scope: RUN_TIME
          value: require
+       - key: APP_APPLICATION__HMAC_SECRET
+         scope: RUN_TIME
+         value: 8aa152855fbb8df14508d9c22c000a8f
 databases:
   - engine: PG
     name: newsletter
