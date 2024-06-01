@@ -61,6 +61,6 @@ pub async fn get_stored_credentials(
 pub enum ValidateUserError {
     #[error("Could not fetch user data.")]
     DatabaseError(#[from] diesel::result::Error),
-    #[error("Invalid username or password.")]
+    #[error("Invalid username.")]
     AuthenticationError(String),
 }

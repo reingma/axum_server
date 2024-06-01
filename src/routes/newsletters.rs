@@ -1,3 +1,4 @@
+use crate::database::queries::ValidateUserError;
 use crate::database::DatabaseConnection;
 use crate::{
     database::queries::{get_confirmed_subscribers, get_stored_credentials},
@@ -118,9 +119,28 @@ fn basic_authentication(
 pub async fn validate_credentials(
     credentials: Credentials,
     connection: &mut DatabaseConnection,
-) -> Result<uuid::Uuid, anyhow::Error> {
+) -> Result<uuid::Uuid, PublishNewsletterError> {
     let (stored_user_id, expected_hash) =
-        get_stored_credentials(&credentials.username, connection).await?;
+        match get_stored_credentials(&credentials.username, connection).await {
+            Ok(row) => (Some(row.0), row.1),
+            Err(e) => match e {
+                ValidateUserError::DatabaseError(e) => {
+                    return Err(PublishNewsletterError::UnexpectedError(
+                        e.into(),
+                    ))
+                }
+                ValidateUserError::AuthenticationError(_) => (
+                    None,
+                    Secret::new(
+                        "$argon2id$v=19$m=15000,t=2,p=1$\
+                    gZiV/M1gPc22ElAH/Jh1Hw$\
+                    CWOrkoo7oJBQ/iyh7uJ0LO2aLEfrHwTWllSAxT0zRno"
+                            .to_string(),
+                    ),
+                ),
+            },
+        };
+
     crate::telemetry::spawn_blocking_with_tracing(move || {
         verify_password_hash(expected_hash, credentials.password)
     })
@@ -128,7 +148,9 @@ pub async fn validate_credentials(
     .context("Failed to spawn blocking task.")
     .map_err(PublishNewsletterError::UnexpectedError)??;
 
-    Ok(stored_user_id)
+    stored_user_id.ok_or_else(|| {
+        PublishNewsletterError::AuthError(anyhow::anyhow!("Invalid username."))
+    })
 }
 
 #[tracing::instrument(

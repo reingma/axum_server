@@ -1,6 +1,9 @@
 use argon2::password_hash::SaltString;
+use argon2::Algorithm;
 use argon2::Argon2;
+use argon2::Params;
 use argon2::PasswordHasher;
+use argon2::Version;
 use axum_newsletter::configuration::get_configuration;
 use axum_newsletter::configuration::DatabaseSettings;
 use axum_newsletter::database::DatabaseConnection;
@@ -54,10 +57,14 @@ impl TestUser {
     }
     pub async fn store(&self, connection: &mut DatabaseConnection) {
         let salt = SaltString::generate(&mut rand::thread_rng());
-        let hash = Argon2::default()
-            .hash_password(self.password.as_bytes(), &salt)
-            .unwrap()
-            .to_string();
+        let hash = Argon2::new(
+            Algorithm::Argon2id,
+            Version::V0x13,
+            Params::new(15000, 2, 1, None).unwrap(),
+        )
+        .hash_password(self.password.as_bytes(), &salt)
+        .unwrap()
+        .to_string();
 
         let user = Users::new(self.user_id, &self.username, &hash);
         diesel::insert_into(users::table)
