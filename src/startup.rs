@@ -1,7 +1,9 @@
 use crate::database::{create_connection_pool, DatabaseConnectionPool};
 use crate::{configuration::Settings, email_client::EmailClient, routes};
+use axum::extract::FromRef;
 use axum::response::Response;
 use axum::{extract::Request, routing, serve::Serve, Router};
+use axum_extra::extract::cookie::Key;
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
 use secrecy::ExposeSecret;
 use secrecy::Secret;
@@ -17,13 +19,13 @@ pub fn run(
     connection_pool: Pool<AsyncPgConnection>,
     email_client: Arc<EmailClient>,
     base_url: String,
-    hmac_secret: Secret<String>,
+    key: Key,
 ) -> Serve<Router, Router> {
     let app_state = ApplicationState {
         database_pool: connection_pool,
         email_client,
         base_url,
-        secret: HmacSecret(hmac_secret),
+        key,
     };
     let app: Router = Router::new()
         .route("/", routing::get(routes::home))
@@ -51,7 +53,12 @@ pub struct ApplicationState {
     pub database_pool: DatabaseConnectionPool,
     pub email_client: Arc<EmailClient>,
     pub base_url: String,
-    pub secret: HmacSecret,
+    key: Key,
+}
+impl FromRef<ApplicationState> for Key {
+    fn from_ref(state: &ApplicationState) -> Self {
+        state.key.clone()
+    }
 }
 
 pub struct Application {
@@ -91,6 +98,13 @@ impl Application {
             configuration.database.connection_string().expose_secret(),
         );
         let port = listener.local_addr().unwrap().port();
+        let key = Key::from(
+            configuration
+                .application
+                .hmac_secret
+                .expose_secret()
+                .as_bytes(),
+        );
 
         Ok(Application {
             pool: pool.clone(),
@@ -99,7 +113,7 @@ impl Application {
                 pool,
                 Arc::new(email_client),
                 configuration.application.base_url,
-                configuration.application.hmac_secret,
+                key,
             ),
             port,
         })
