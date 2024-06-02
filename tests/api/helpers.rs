@@ -151,6 +151,21 @@ impl TestApp {
             .await
             .expect("Request failed.")
     }
+
+    pub async fn post_login<Body>(&self, body: &Body) -> reqwest::Response
+    where
+        Body: serde::Serialize,
+    {
+        reqwest::Client::builder()
+            .redirect(reqwest::redirect::Policy::none())
+            .build()
+            .unwrap()
+            .post(&format!("{}/login", &self.address))
+            .form(body)
+            .send()
+            .await
+            .expect("Failed to send request.")
+    }
 }
 pub async fn spawn_app(migration: Option<EmbeddedMigrations>) -> TestApp {
     Lazy::force(&TRACING);
@@ -246,4 +261,9 @@ pub fn generate_valid_subscriber_token() -> String {
         .map(char::from)
         .take(25)
         .collect()
+}
+
+pub fn assert_is_redirect_to(response: &reqwest::Response, location: &str) {
+    assert_eq!(response.status().as_u16(), 303);
+    assert_eq!(response.headers().get("Location").unwrap(), location);
 }
