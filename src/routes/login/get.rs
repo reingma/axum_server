@@ -1,64 +1,39 @@
 use anyhow::Context;
 use axum::{
-    extract::{Query, State},
     http::{Response, StatusCode},
     response::IntoResponse,
 };
-use hmac::Mac;
-use secrecy::ExposeSecret;
+use axum_extra::extract::SignedCookieJar;
+use cookie::Cookie;
 use tracing::instrument;
 
-use crate::{
-    startup::{ApplicationState, HmacSecret},
-    TEMPLATES,
-};
+use crate::TEMPLATES;
 
-#[derive(serde::Deserialize)]
-pub struct LoginQueryParameters {
-    error: String,
-    tag: String,
-}
-
-impl LoginQueryParameters {
-    fn verify(self, secret: &HmacSecret) -> Result<String, anyhow::Error> {
-        let tag = hex::decode(self.tag)?;
-        let query_string =
-            format!("error={}", urlencoding::Encoded::new(&self.error));
-        let mut mac = hmac::Hmac::<sha2::Sha256>::new_from_slice(
-            secret.0.expose_secret().as_bytes(),
-        )
-        .unwrap();
-        mac.update(query_string.as_bytes());
-        mac.verify_slice(&tag)?;
-        Ok(self.error)
-    }
-}
-
-#[instrument(name = "Requesting login page", skip(app_state, query_params))]
+#[instrument(name = "Requesting login page")]
 pub async fn login_form(
-    State(app_state): State<ApplicationState>,
-    query_params: Option<Query<LoginQueryParameters>>,
-) -> Result<Response<String>, LoginFormError> {
-    let error_html = match query_params {
-        Some(params) => match params.0.verify(&app_state.secret) {
-            Ok(error) => error,
-            Err(e) => {
-                tracing::warn!(error.message = %e, error.cause_chain = %e, "Failed to verify query parameters using HMAC tag");
-                "".into()
-            }
-        },
-        None => "".into(),
-    };
+    jar: SignedCookieJar,
+) -> Result<(SignedCookieJar, Response<String>), LoginFormError> {
     let mut tera_context = tera::Context::new();
+    let error_html = if let Some(error) =
+        jar.get("_flash").map(|cookie| cookie.value().to_owned())
+    {
+        error.to_string()
+    } else {
+        "".to_string()
+    };
     tera_context.insert("error", &error_html);
     let html_body = TEMPLATES
         .render("pages/login.html", &tera_context)
         .context("Could not render login page.")?;
-    Ok(Response::builder()
-        .status(StatusCode::OK)
-        .header(axum::http::header::CONTENT_TYPE, "text/html")
-        .body(html_body)
-        .context("Could not create response.")?)
+    let jar = jar.remove(Cookie::from("_flash"));
+    Ok((
+        jar,
+        Response::builder()
+            .status(StatusCode::OK)
+            .header(axum::http::header::CONTENT_TYPE, "text/html")
+            .body(html_body)
+            .context("Could not create response.")?,
+    ))
 }
 
 #[derive(thiserror::Error, Debug)]

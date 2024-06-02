@@ -5,8 +5,8 @@ use axum::{
     response::{IntoResponse, Redirect},
     Form,
 };
-use hmac::Mac;
-use secrecy::{ExposeSecret, Secret};
+use axum_extra::extract::{cookie::Cookie, SignedCookieJar};
+use secrecy::Secret;
 use tracing::instrument;
 
 use crate::{
@@ -19,11 +19,12 @@ pub struct FormData {
     username: String,
     password: Secret<String>,
 }
-#[instrument(skip(app_state,form), fields(username=tracing::field::Empty, user_id=tracing::field::Empty))]
+#[instrument(skip(app_state,form,jar), fields(username=tracing::field::Empty, user_id=tracing::field::Empty))]
 pub async fn login(
     State(app_state): State<ApplicationState>,
+    jar: SignedCookieJar,
     Form(form): Form<FormData>,
-) -> Result<Redirect, LoginError> {
+) -> Result<(SignedCookieJar, Redirect), LoginError> {
     let credentials = Credentials {
         username: form.username,
         password: form.password,
@@ -38,7 +39,7 @@ pub async fn login(
         Ok(user_id) => {
             tracing::Span::current()
                 .record("user_id", &tracing::field::display(&user_id));
-            Ok(Redirect::to("/"))
+            Ok((jar, Redirect::to("/login")))
         }
         Err(e) => {
             let e = match e {
@@ -50,20 +51,8 @@ pub async fn login(
                 }
             };
             tracing::error!("{} Reason {:?}", e, e);
-            let query_string =
-                format!("error={}", urlencoding::Encoded::new(e.to_string()));
-            let hmac_tag = {
-                let mut mac = hmac::Hmac::<sha2::Sha256>::new_from_slice(
-                    app_state.secret.0.expose_secret().as_bytes(),
-                )
-                .unwrap();
-                mac.update(query_string.as_bytes());
-                mac.finalize().into_bytes()
-            };
-            Ok(Redirect::to(&format!(
-                "/login?{}&tag={:x}",
-                query_string, hmac_tag
-            )))
+            let cookie = Cookie::new("_flash", e.to_string());
+            Ok((jar.add(cookie), Redirect::to("/login")))
         }
     }
 }

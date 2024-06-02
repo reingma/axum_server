@@ -24,7 +24,6 @@ use once_cell::sync::Lazy;
 use rand::distributions::Alphanumeric;
 use rand::thread_rng;
 use rand::Rng;
-use reqwest::Client;
 use secrecy::ExposeSecret;
 use std::future::IntoFuture;
 use uuid::Uuid;
@@ -90,6 +89,7 @@ pub struct TestApp {
     pub email_server: MockServer,
     pub server_port: u16,
     pub test_user: TestUser,
+    pub request_client: reqwest::Client,
 }
 
 impl TestApp {
@@ -97,7 +97,7 @@ impl TestApp {
         &self,
         body: String,
     ) -> Result<reqwest::Response, reqwest::Error> {
-        Client::new()
+        self.request_client
             .post(&format!("{}/subscriptions", &self.address))
             .header("Content-Type", "application/x-www-form-urlencoded")
             .body(body)
@@ -108,7 +108,7 @@ impl TestApp {
     pub async fn check_health(
         &self,
     ) -> Result<reqwest::Response, reqwest::Error> {
-        Client::new()
+        self.request_client
             .get(&format!("{}/health_check", &self.address))
             .send()
             .await
@@ -143,7 +143,7 @@ impl TestApp {
         body: serde_json::Value,
     ) -> reqwest::Response {
         let (uname, pword) = self.test_user.get_credentials();
-        reqwest::Client::new()
+        self.request_client
             .post(&format!("{}/newsletters", &self.address))
             .basic_auth(uname, Some(pword))
             .json(&body)
@@ -156,15 +156,23 @@ impl TestApp {
     where
         Body: serde::Serialize,
     {
-        reqwest::Client::builder()
-            .redirect(reqwest::redirect::Policy::none())
-            .build()
-            .unwrap()
+        self.request_client
             .post(&format!("{}/login", &self.address))
             .form(body)
             .send()
             .await
             .expect("Failed to send request.")
+    }
+
+    pub async fn get_login_html(&self) -> String {
+        self.request_client
+            .get(&format!("{}/login", &self.address))
+            .send()
+            .await
+            .expect("Failed to send request")
+            .text()
+            .await
+            .unwrap()
     }
 }
 pub async fn spawn_app(migration: Option<EmbeddedMigrations>) -> TestApp {
@@ -178,6 +186,11 @@ pub async fn spawn_app(migration: Option<EmbeddedMigrations>) -> TestApp {
         c.email_client.base_url = email_server.uri();
         c
     };
+    let request_client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .cookie_store(true)
+        .build()
+        .unwrap();
 
     configure_database(&configuration.database, migration).await;
 
@@ -191,6 +204,7 @@ pub async fn spawn_app(migration: Option<EmbeddedMigrations>) -> TestApp {
         email_server,
         server_port: application.port(),
         test_user: TestUser::generate(),
+        request_client,
     };
     let mut connection = testapp
         .pool
