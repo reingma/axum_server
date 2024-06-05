@@ -10,23 +10,38 @@ use secrecy::Secret;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::TcpListener;
+use tokio::task::JoinHandle;
 use tower_http::trace::TraceLayer;
+use tower_sessions::{Expiry, SessionManagerLayer};
+use tower_sessions_redis_store::{fred::prelude::*, RedisStore};
 use tracing::{info_span, Span};
 use uuid::Uuid;
 
-pub fn run(
+pub async fn run(
     listener: TcpListener,
     connection_pool: Pool<AsyncPgConnection>,
     email_client: Arc<EmailClient>,
     base_url: String,
     key: Key,
-) -> Serve<Router, Router> {
+    redis_uri: Secret<String>,
+) -> Result<(Serve<Router, Router>, RedisConnection), anyhow::Error> {
     let app_state = ApplicationState {
         database_pool: connection_pool,
         email_client,
         base_url,
         key,
     };
+    let redis_pool = RedisPool::new(
+        RedisConfig::from_url(redis_uri.expose_secret())?,
+        None,
+        None,
+        None,
+        6,
+    )?;
+    let redis_connection = redis_pool.connect();
+    redis_pool.wait_for_connect().await?;
+    let session_store = RedisStore::new(redis_pool);
+    let session_layer = SessionManagerLayer::new(session_store);
     let app: Router = Router::new()
         .route("/", routing::get(routes::home))
         .route("/health_check", routing::get(routes::health_check))
@@ -35,6 +50,7 @@ pub fn run(
         .route("/newsletters", routing::post(routes::publish_newsletter))
         .route("/login", routing::get(routes::login_form))
         .route("/login", routing::post(routes::login))
+        .layer(session_layer)
         .layer(TraceLayer::new_for_http().make_span_with(
             |request: &Request<_>| {
                 let request_id = Uuid::now_v7();
@@ -45,7 +61,8 @@ pub fn run(
             }))
         .with_state(app_state);
 
-    axum::serve(listener, app)
+    //    redis_connection.await??;
+    Ok((axum::serve(listener, app), redis_connection))
 }
 
 #[derive(Clone)]
@@ -61,10 +78,12 @@ impl FromRef<ApplicationState> for Key {
     }
 }
 
+type RedisConnection = JoinHandle<Result<(), RedisError>>;
 pub struct Application {
     port: u16,
     pool: Pool<AsyncPgConnection>,
     server: Serve<Router, Router>,
+    redis_connection_handle: RedisConnection,
 }
 
 #[derive(Clone)]
@@ -73,7 +92,7 @@ pub struct HmacSecret(pub Secret<String>);
 impl Application {
     pub async fn build(
         configuration: Settings,
-    ) -> Result<Application, std::io::Error> {
+    ) -> Result<Application, anyhow::Error> {
         let address = format!(
             "{}:{}",
             configuration.application.host, configuration.application.port
@@ -105,17 +124,22 @@ impl Application {
                 .expose_secret()
                 .as_bytes(),
         );
+        let pool_clone = pool.clone();
+        let (server, redis_connection_handle) = run(
+            listener,
+            pool,
+            Arc::new(email_client),
+            configuration.application.base_url,
+            key,
+            configuration.application.redis_uri,
+        )
+        .await?;
 
         Ok(Application {
-            pool: pool.clone(),
-            server: run(
-                listener,
-                pool,
-                Arc::new(email_client),
-                configuration.application.base_url,
-                key,
-            ),
+            pool: pool_clone,
+            server,
             port,
+            redis_connection_handle,
         })
     }
 
@@ -127,7 +151,9 @@ impl Application {
         self.pool.clone()
     }
 
-    pub async fn run_until_stopped(self) -> Result<(), std::io::Error> {
-        self.server.await
+    pub async fn run_until_stopped(self) -> Result<(), anyhow::Error> {
+        self.server.await?;
+        self.redis_connection_handle.await??;
+        Ok(())
     }
 }

@@ -4,7 +4,7 @@ use axum_newsletter::{
 };
 
 #[tokio::main]
-async fn main() -> Result<(), std::io::Error> {
+async fn main() -> anyhow::Result<()> {
     setup_tracing("axum_newsletter", "info", std::io::stdout);
     let configuration =
         get_configuration().expect("Could not read configuration file");
