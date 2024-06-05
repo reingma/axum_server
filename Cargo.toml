@@ -21,7 +21,7 @@ axum = "0.7.4"
 axum-macros = "0.4.1"
 chrono = "0.4.34"
 claims = "0.7.1"
-config = "0.14.0"
+config = {git = "https://github.com/mehcode/config-rs"}
 deadpool = "0.10.0"
 diesel = { version = "2.1.4", features = ["uuid", "chrono"] }
 diesel-async = { version = "0.4.1", features = ["postgres", "deadpool", "async-connection-wrapper"] }
@@ -57,3 +57,5 @@ argon2 = {version = "0.5.3", features = ["std"]}
 urlencoding = "2"
 axum-extra = {version = "0.9.3", features = ["cookie", "cookie-signed"]}
 cookie = "0.18.1"
+tower-sessions = "0.12.2"
+tower-sessions-redis-store = "0.12.0"
