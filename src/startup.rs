@@ -12,7 +12,7 @@ use std::time::Duration;
 use tokio::net::TcpListener;
 use tokio::task::JoinHandle;
 use tower_http::trace::TraceLayer;
-use tower_sessions::{Expiry, SessionManagerLayer};
+use tower_sessions::SessionManagerLayer;
 use tower_sessions_redis_store::{fred::prelude::*, RedisStore};
 use tracing::{info_span, Span};
 use uuid::Uuid;
