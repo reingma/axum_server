@@ -20,7 +20,7 @@ pub async fn store_token(
     connection: &mut DatabaseConnection,
     subscriber_token: &SubscriptionToken,
     sub_id: &Uuid,
-) -> Result<(), diesel::result::Error> {
+) -> Result<(), StoreTokenError> {
     let token_entry =
         SubscriptionTokens::new(subscriber_token.as_ref(), sub_id);
     diesel::insert_into(schema::subscription_tokens::table)
@@ -67,3 +67,7 @@ pub async fn confirm_subscriber(
         .await?;
     Ok(())
 }
+
+#[derive(Debug, thiserror::Error)]
+#[error("A database error has ocurred when storing a subscription token")]
+pub struct StoreTokenError(#[from] diesel::result::Error);

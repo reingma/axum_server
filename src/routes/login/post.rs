@@ -41,6 +41,7 @@ pub async fn login(
         Ok(user_id) => {
             tracing::Span::current()
                 .record("user_id", &tracing::field::display(&user_id));
+            session.cycle_id().await.context("Session failure")?;
             if let Err(e) = session
                 .insert("user_id", user_id)
                 .await
