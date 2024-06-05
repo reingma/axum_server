@@ -7,6 +7,7 @@ use axum::{
 };
 use axum_extra::extract::{cookie::Cookie, SignedCookieJar};
 use secrecy::Secret;
+use tower_sessions::Session;
 use tracing::instrument;
 
 use crate::{
@@ -22,6 +23,7 @@ pub struct FormData {
 #[instrument(skip(app_state,form,jar), fields(username=tracing::field::Empty, user_id=tracing::field::Empty))]
 pub async fn login(
     State(app_state): State<ApplicationState>,
+    session: Session,
     jar: SignedCookieJar,
     Form(form): Form<FormData>,
 ) -> Result<(SignedCookieJar, Redirect), LoginError> {
@@ -39,7 +41,14 @@ pub async fn login(
         Ok(user_id) => {
             tracing::Span::current()
                 .record("user_id", &tracing::field::display(&user_id));
-            Ok((jar, Redirect::to("/login")))
+            if let Err(e) = session
+                .insert("user_id", user_id)
+                .await
+                .context("Could not store user_id")
+            {
+                return Ok(login_redirect(e.into(), jar));
+            };
+            Ok((jar, Redirect::to("/admin/dashboard")))
         }
         Err(e) => {
             let e = match e {
@@ -50,11 +59,18 @@ pub async fn login(
                     LoginError::AuthError(e.into())
                 }
             };
-            tracing::error!("{} Reason {:?}", e, e);
-            let cookie = Cookie::new("_flash", e.to_string());
-            Ok((jar.add(cookie), Redirect::to("/login")))
+            Ok(login_redirect(e, jar))
         }
     }
+}
+
+fn login_redirect(
+    e: LoginError,
+    jar: SignedCookieJar,
+) -> (SignedCookieJar, Redirect) {
+    tracing::error!("{} Reason {:?}", e, e);
+    let cookie = Cookie::new("_flash", e.to_string());
+    (jar.add(cookie), Redirect::to("/login"))
 }
 
 #[derive(thiserror::Error, Debug)]

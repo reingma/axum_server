@@ -50,6 +50,7 @@ pub async fn run(
         .route("/newsletters", routing::post(routes::publish_newsletter))
         .route("/login", routing::get(routes::login_form))
         .route("/login", routing::post(routes::login))
+        .route("/admin/dashboard", routing::get(routes::admin_dashboard))
         .layer(session_layer)
         .layer(TraceLayer::new_for_http().make_span_with(
             |request: &Request<_>| {
