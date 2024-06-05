@@ -174,6 +174,16 @@ impl TestApp {
             .await
             .unwrap()
     }
+    pub async fn get_admin_dashboard_html(&self) -> String {
+        self.request_client
+            .get(&format!("{}/admin/dashboard", &self.address))
+            .send()
+            .await
+            .expect("Failed to send request")
+            .text()
+            .await
+            .unwrap()
+    }
 }
 pub async fn spawn_app(migration: Option<EmbeddedMigrations>) -> TestApp {
     Lazy::force(&TRACING);
