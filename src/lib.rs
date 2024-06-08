@@ -6,6 +6,7 @@ pub mod email_client;
 pub mod models;
 pub mod routes;
 pub mod schema;
+pub mod session_state;
 pub mod startup;
 pub mod telemetry;
 
