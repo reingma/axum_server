@@ -5,25 +5,24 @@ use axum::{
     http::{Response, StatusCode},
     response::IntoResponse,
 };
-use tower_sessions::Session;
 use tracing::instrument;
-use uuid::Uuid;
 
 use crate::{
-    database::queries::get_username, startup::ApplicationState, TEMPLATES,
+    database::queries::get_username, session_state::TypedSession,
+    startup::ApplicationState, TEMPLATES,
 };
 
 #[instrument(skip(app_state, session))]
 pub async fn admin_dashboard(
     State(app_state): State<ApplicationState>,
-    session: Session,
+    session: TypedSession,
 ) -> Result<Response<Body>, DashboardError> {
     let mut connection =
         crate::database::get_connection(app_state.database_pool)
             .await
             .context("Could not get database pool")?;
     let username = if let Some(user_id) = session
-        .get::<Uuid>("user_id")
+        .get_user_id()
         .await
         .context("Failed to get user_id")?
     {

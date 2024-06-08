@@ -7,11 +7,11 @@ use axum::{
 };
 use axum_extra::extract::{cookie::Cookie, SignedCookieJar};
 use secrecy::Secret;
-use tower_sessions::Session;
 use tracing::instrument;
 
 use crate::{
     authentication::{validate_credentials, AuthError, Credentials},
+    session_state::TypedSession,
     startup::ApplicationState,
 };
 
@@ -20,10 +20,10 @@ pub struct FormData {
     username: String,
     password: Secret<String>,
 }
-#[instrument(skip(app_state,form,jar), fields(username=tracing::field::Empty, user_id=tracing::field::Empty))]
+#[instrument(skip(app_state,form,jar, session), fields(username=tracing::field::Empty, user_id=tracing::field::Empty))]
 pub async fn login(
     State(app_state): State<ApplicationState>,
-    session: Session,
+    session: TypedSession,
     jar: SignedCookieJar,
     Form(form): Form<FormData>,
 ) -> Result<(SignedCookieJar, Redirect), LoginError> {
@@ -43,7 +43,7 @@ pub async fn login(
                 .record("user_id", &tracing::field::display(&user_id));
             session.cycle_id().await.context("Session failure")?;
             if let Err(e) = session
-                .insert("user_id", user_id)
+                .insert_user_id(user_id)
                 .await
                 .context("Could not store user_id")
             {

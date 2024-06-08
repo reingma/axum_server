@@ -59,3 +59,4 @@ axum-extra = {version = "0.9.3", features = ["cookie", "cookie-signed"]}
 cookie = "0.18.1"
 tower-sessions = "0.12.2"
 tower-sessions-redis-store = "0.12.0"
+async-trait = "0.1.80"
