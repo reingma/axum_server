@@ -1,10 +1,20 @@
 use anyhow::Context;
 use argon2::{Argon2, PasswordHash, PasswordVerifier};
+use axum::{
+    extract::Request,
+    http::StatusCode,
+    middleware::Next,
+    response::{IntoResponse, Redirect, Response},
+};
 use secrecy::{ExposeSecret, Secret};
 
-use crate::database::{
-    queries::{get_stored_credentials, ValidateUserError},
-    DatabaseConnection,
+use crate::{
+    database::{
+        queries::{get_stored_credentials, ValidateUserError},
+        DatabaseConnection,
+    },
+    domain::Password,
+    session_state::TypedSession,
 };
 
 #[derive(thiserror::Error, Debug)]
@@ -17,7 +27,7 @@ pub enum AuthError {
 
 pub struct Credentials {
     pub username: String,
-    pub password: Secret<String>,
+    pub password: Password,
 }
 
 #[tracing::instrument(
@@ -65,7 +75,7 @@ pub async fn validate_credentials(
 )]
 fn verify_password_hash(
     expected_password_hash: Secret<String>,
-    password_candidate: Secret<String>,
+    password_candidate: Password,
 ) -> Result<(), AuthError> {
     let expected_hash =
         PasswordHash::new(expected_password_hash.expose_secret())
@@ -73,10 +83,34 @@ fn verify_password_hash(
             .map_err(AuthError::UnexpectedError)?;
     Argon2::default()
         .verify_password(
-            password_candidate.expose_secret().as_bytes(),
+            password_candidate.as_ref().expose_secret().as_bytes(),
             &expected_hash,
         )
         .context("Invalid password.")
         .map_err(AuthError::InvalidCredentials)?;
     Ok(())
+}
+
+#[tracing::instrument(
+    name = "Middleware Credential Checking",
+    skip(session, request, next)
+)]
+pub async fn check_credentials(
+    session: TypedSession,
+    request: Request,
+    next: Next,
+) -> Result<impl IntoResponse, Response> {
+    if session
+        .get_user_id()
+        .await
+        .context("Could not confirm user login")
+        .map_err(|err| {
+            (StatusCode::UNAUTHORIZED, err.to_string()).into_response()
+        })?
+        .is_none()
+    {
+        Ok(Redirect::to("/login").into_response())
+    } else {
+        Ok(next.run(request).await)
+    }
 }

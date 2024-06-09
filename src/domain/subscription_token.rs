@@ -6,7 +6,7 @@ use rand::Rng;
 pub struct SubscriptionToken(String);
 
 impl TryFrom<String> for SubscriptionToken {
-    type Error = String;
+    type Error = InvalidSubscriptionToken;
     fn try_from(value: String) -> Result<Self, Self::Error> {
         let is_empty_or_whitespace = value.trim().is_empty();
         let is_of_right_size = value.len() == 25;
@@ -16,7 +16,7 @@ impl TryFrom<String> for SubscriptionToken {
             value.chars().any(|c| forbidden_characters.contains(&c));
         if is_empty_or_whitespace || !is_of_right_size || has_invalid_characters
         {
-            return Err(format!("{} is a invalid token", value));
+            return Err(InvalidSubscriptionToken());
         }
         Ok(Self(value))
     }
@@ -38,6 +38,10 @@ impl SubscriptionToken {
         Self::try_from(raw_token).expect("Generated token was invalid")
     }
 }
+
+#[derive(thiserror::Error, Debug)]
+#[error("Subscription token is invalid.")]
+pub struct InvalidSubscriptionToken();
 
 #[cfg(test)]
 mod tests {

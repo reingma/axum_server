@@ -3,12 +3,12 @@ use validator::ValidateEmail;
 pub struct SubscriberEmail(String);
 
 impl TryFrom<String> for SubscriberEmail {
-    type Error = String;
+    type Error = InvalidEmail;
     fn try_from(value: String) -> Result<Self, Self::Error> {
         if ValidateEmail::validate_email(&value) {
             Ok(Self(value))
         } else {
-            Err(format!("{} is not a valid subscriber email.", value))
+            Err(InvalidEmail())
         }
     }
 }
@@ -58,3 +58,7 @@ mod tests {
         }
     }
 }
+
+#[derive(thiserror::Error, Debug)]
+#[error("Email is invalid.")]
+pub struct InvalidEmail();

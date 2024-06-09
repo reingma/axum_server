@@ -10,10 +10,10 @@ pub async fn get_username(
     connection: &mut DatabaseConnection,
     id: Uuid,
 ) -> Result<String, anyhow::Error> {
-    Ok(users
+    users
         .filter(schema::users::user_id.eq(id))
         .select(schema::users::username)
         .first(connection)
         .await
-        .context("Failed to retrieve username from database")?)
+        .context("Failed to retrieve username from database")
 }

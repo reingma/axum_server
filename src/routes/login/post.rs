@@ -1,12 +1,13 @@
-use anyhow::Context;
+use crate::{domain::Password, utils::redirect_with_flash};
+use anyhow::{anyhow, Context};
 use axum::{
     extract::State,
     http::{Response, StatusCode},
     response::{IntoResponse, Redirect},
     Form,
 };
-use axum_extra::extract::{cookie::Cookie, SignedCookieJar};
-use secrecy::Secret;
+use axum_extra::extract::SignedCookieJar;
+use secrecy::{ExposeSecret, Secret};
 use tracing::instrument;
 
 use crate::{
@@ -27,9 +28,20 @@ pub async fn login(
     jar: SignedCookieJar,
     Form(form): Form<FormData>,
 ) -> Result<(SignedCookieJar, Redirect), LoginError> {
+    let password =
+        match Password::try_from(form.password.expose_secret().to_string()) {
+            Ok(pass) => pass,
+            Err(_) => {
+                return Ok(redirect_with_flash(
+                    "/login",
+                    anyhow!("Invalid password."),
+                    jar,
+                ))
+            }
+        };
     let credentials = Credentials {
         username: form.username,
-        password: form.password,
+        password,
     };
     tracing::Span::current()
         .record("username", &tracing::field::display(&credentials.username));
@@ -47,7 +59,7 @@ pub async fn login(
                 .await
                 .context("Could not store user_id")
             {
-                return Ok(login_redirect(e.into(), jar));
+                return Ok(redirect_with_flash("/login", e, jar));
             };
             Ok((jar, Redirect::to("/admin/dashboard")))
         }
@@ -60,18 +72,9 @@ pub async fn login(
                     LoginError::AuthError(e.into())
                 }
             };
-            Ok(login_redirect(e, jar))
+            Ok(redirect_with_flash("/login", e.into(), jar))
         }
     }
-}
-
-fn login_redirect(
-    e: LoginError,
-    jar: SignedCookieJar,
-) -> (SignedCookieJar, Redirect) {
-    tracing::error!("{} Reason {:?}", e, e);
-    let cookie = Cookie::new("_flash", e.to_string());
-    (jar.add(cookie), Redirect::to("/login"))
 }
 
 #[derive(thiserror::Error, Debug)]

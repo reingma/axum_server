@@ -4,16 +4,22 @@ use unicode_segmentation::UnicodeSegmentation;
 pub struct SubscriberName(String);
 
 impl TryFrom<String> for SubscriberName {
-    type Error = String;
+    type Error = InvalidNameError;
     fn try_from(value: String) -> Result<Self, Self::Error> {
         let is_empty_or_whitespace = value.trim().is_empty();
+        if is_empty_or_whitespace {
+            return Err(InvalidNameError::NameIsEmpty);
+        }
         let is_too_long = value.graphemes(true).count() > 256;
+        if is_too_long {
+            return Err(InvalidNameError::NameIsTooLong);
+        }
         let forbidden_characters =
             ['/', '(', ')', '"', '<', '>', '\\', '{', '}'];
         let has_forbidden_chars =
             value.chars().any(|g| forbidden_characters.contains(&g));
-        if is_too_long || is_empty_or_whitespace || has_forbidden_chars {
-            Err(format!("{} is not a valid subscriber name", value))
+        if has_forbidden_chars {
+            Err(InvalidNameError::ForbiddenCharacters)
         } else {
             Ok(Self(value))
         }
@@ -62,4 +68,14 @@ mod tests {
         let name = "Gabriel Aguiar".to_string();
         assert_ok!(SubscriberName::try_from(name));
     }
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum InvalidNameError {
+    #[error("Name is too long.")]
+    NameIsTooLong,
+    #[error("Name is empty.")]
+    NameIsEmpty,
+    #[error("Name has forbidden characters.")]
+    ForbiddenCharacters,
 }

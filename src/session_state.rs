@@ -27,6 +27,10 @@ impl TypedSession {
     ) -> Result<Option<Uuid>, tower_sessions::session::Error> {
         self.0.get(Self::USER_ID_KEY).await
     }
+
+    pub async fn logout(&self) -> Result<(), tower_sessions::session::Error> {
+        self.0.delete().await
+    }
 }
 
 #[async_trait]
