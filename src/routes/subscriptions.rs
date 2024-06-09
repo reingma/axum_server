@@ -31,9 +31,15 @@ pub async fn subscriptions(
     State(app_state): State<ApplicationState>,
     Form(subscriber): Form<Subscriber>,
 ) -> Result<StatusCode, SubscriptionError> {
-    let new_subscriber: NewSubscriber = subscriber
-        .try_into()
-        .map_err(SubscriptionError::InvalidSubscriberData)?;
+    let new_subscriber: NewSubscriber =
+        subscriber.try_into().map_err(|err| match err {
+            crate::domain::InvalidSubscriber::InvalidEmail(message) => {
+                SubscriptionError::InvalidSubscriberData(message.to_string())
+            }
+            crate::domain::InvalidSubscriber::InvalidName(message) => {
+                SubscriptionError::InvalidSubscriberData(message.to_string())
+            }
+        })?;
     tracing::info!("Adding a new subscriber to the database.");
 
     let mut connection =

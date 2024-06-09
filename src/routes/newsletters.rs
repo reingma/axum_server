@@ -1,4 +1,5 @@
 use crate::authentication::{validate_credentials, AuthError, Credentials};
+use crate::domain::Password;
 use crate::{
     database::queries::get_confirmed_subscribers, startup::ApplicationState,
 };
@@ -10,7 +11,6 @@ use axum::{
     Json,
 };
 use base64::Engine;
-use secrecy::Secret;
 
 #[tracing::instrument(
     name = "Publish a newsletter issue",
@@ -107,10 +107,9 @@ fn basic_authentication(
         })?
         .to_string();
 
-    Ok(Credentials {
-        username,
-        password: Secret::new(password),
-    })
+    let password =
+        Password::try_from(password).context("Authentication failed.")?;
+    Ok(Credentials { username, password })
 }
 
 #[derive(serde::Deserialize)]

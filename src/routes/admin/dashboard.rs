@@ -3,7 +3,7 @@ use axum::{
     body::Body,
     extract::State,
     http::{Response, StatusCode},
-    response::IntoResponse,
+    response::{IntoResponse, Redirect},
 };
 use tracing::instrument;
 
@@ -28,7 +28,7 @@ pub async fn admin_dashboard(
     {
         get_username(&mut connection, user_id).await?
     } else {
-        todo!()
+        return Ok(Redirect::to("/login").into_response());
     };
     let mut tera_context = tera::Context::new();
     tera_context.insert("user_name", &username.to_string());

@@ -2,7 +2,7 @@ use secrecy::{ExposeSecret, Secret};
 use serde::Deserialize;
 use serde_aux::field_attributes::deserialize_number_from_string;
 
-use crate::domain::SubscriberEmail;
+use crate::domain::{InvalidEmail, SubscriberEmail};
 
 #[derive(serde::Deserialize, Clone)]
 pub struct Settings {
@@ -20,7 +20,7 @@ pub struct EmailClientSettings {
 }
 
 impl EmailClientSettings {
-    pub fn sender(&self) -> Result<SubscriberEmail, String> {
+    pub fn sender(&self) -> Result<SubscriberEmail, InvalidEmail> {
         SubscriberEmail::try_from(self.sender_email.clone())
     }
 

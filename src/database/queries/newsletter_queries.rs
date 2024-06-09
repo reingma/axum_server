@@ -1,5 +1,5 @@
 use crate::database::DatabaseConnection;
-use crate::domain::SubscriberEmail;
+use crate::domain::{InvalidEmail, SubscriberEmail};
 use crate::schema::subscriptions::dsl::*;
 use crate::schema::users::dsl::*;
 use diesel::prelude::*;
@@ -13,7 +13,8 @@ pub struct ConfirmedSubscriber {
 #[tracing::instrument(name = "Get Confirmed subscribers", skip(connection))]
 pub async fn get_confirmed_subscribers(
     connection: &mut DatabaseConnection,
-) -> Result<Vec<Result<ConfirmedSubscriber, String>>, diesel::result::Error> {
+) -> Result<Vec<Result<ConfirmedSubscriber, InvalidEmail>>, diesel::result::Error>
+{
     let emails: Vec<String> = subscriptions
         .filter(status.eq("confirmed"))
         .select(email)

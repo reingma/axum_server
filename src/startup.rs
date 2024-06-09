@@ -1,6 +1,8 @@
+use crate::authentication::check_credentials;
 use crate::database::{create_connection_pool, DatabaseConnectionPool};
 use crate::{configuration::Settings, email_client::EmailClient, routes};
 use axum::extract::FromRef;
+use axum::middleware;
 use axum::response::Response;
 use axum::{extract::Request, routing, serve::Serve, Router};
 use axum_extra::extract::cookie::Key;
@@ -11,6 +13,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::TcpListener;
 use tokio::task::JoinHandle;
+use tower::ServiceBuilder;
 use tower_http::trace::TraceLayer;
 use tower_sessions::SessionManagerLayer;
 use tower_sessions_redis_store::{fred::prelude::*, RedisStore};
@@ -42,7 +45,33 @@ pub async fn run(
     redis_pool.wait_for_connect().await?;
     let session_store = RedisStore::new(redis_pool);
     let session_layer = SessionManagerLayer::new(session_store);
-    let app: Router = Router::new()
+    let tracing_layer = TraceLayer::new_for_http().make_span_with(
+            |request: &Request<_>| {
+                let request_id = Uuid::now_v7();
+                info_span!("Http Request", %request_id, request_uri = %request.uri(), response_code = tracing::field::Empty)
+            }
+        ).on_response(|response: &Response, _latency: Duration, span: &Span|{
+                span.record("response_code", response.status().as_str());
+            });
+    /*let auth_layer = ServiceBuilder::new()
+    .layer(HandleErrorLayer::new(|_: BoxError| async {
+        StatusCode::UNAUTHORIZED
+    }))
+    .layer(middleware::from_fn(check_credentials));*/
+    let admin_routes = Router::new()
+        .route("/admin/dashboard", routing::get(routes::admin_dashboard))
+        .route("/admin/password", routing::get(routes::reset_password_form))
+        .route("/admin/password", routing::post(routes::change_pasword))
+        .route("/admin/logout", routing::post(routes::logout))
+        .layer(
+            ServiceBuilder::new()
+                .layer(session_layer.clone())
+                .layer(middleware::from_fn(check_credentials)),
+        )
+        .layer(tracing_layer.clone())
+        .with_state(app_state.clone());
+
+    let basic_routes: Router = Router::new()
         .route("/", routing::get(routes::home))
         .route("/health_check", routing::get(routes::health_check))
         .route("/subscriptions", routing::post(routes::subscriptions))
@@ -50,17 +79,11 @@ pub async fn run(
         .route("/newsletters", routing::post(routes::publish_newsletter))
         .route("/login", routing::get(routes::login_form))
         .route("/login", routing::post(routes::login))
-        .route("/admin/dashboard", routing::get(routes::admin_dashboard))
         .layer(session_layer)
-        .layer(TraceLayer::new_for_http().make_span_with(
-            |request: &Request<_>| {
-                let request_id = Uuid::now_v7();
-                info_span!("Http Request", %request_id, request_uri = %request.uri(), response_code = tracing::field::Empty)
-            }
-        ).on_response(|response: &Response, _latency: Duration, span: &Span|{
-                span.record("response_code", response.status().as_str());
-            }))
+        .layer(tracing_layer)
         .with_state(app_state);
+
+    let app = basic_routes.merge(admin_routes);
 
     //    redis_connection.await??;
     Ok((axum::serve(listener, app), redis_connection))

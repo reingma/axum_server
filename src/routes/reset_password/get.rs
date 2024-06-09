@@ -9,15 +9,15 @@ use tracing::instrument;
 
 use crate::{utils::get_flash_error, TEMPLATES};
 
-#[instrument(name = "Requesting login page")]
-pub async fn login_form(
+#[instrument(name = "Requesting reset_password page")]
+pub async fn reset_password_form(
     jar: SignedCookieJar,
-) -> Result<(SignedCookieJar, Response<Body>), LoginFormError> {
+) -> Result<(SignedCookieJar, Response<Body>), PasswordFormError> {
+    let (jar, html_error) = get_flash_error(jar);
     let mut tera_context = tera::Context::new();
-    let (jar, error_html) = get_flash_error(jar);
-    tera_context.insert("error", &error_html);
+    tera_context.insert("error", &html_error);
     let html_body = TEMPLATES
-        .render("pages/login.html", &tera_context)
+        .render("pages/reset_password.html", &tera_context)
         .context("Could not render login page.")?;
     Ok((
         jar,
@@ -30,12 +30,12 @@ pub async fn login_form(
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum LoginFormError {
+pub enum PasswordFormError {
     #[error(transparent)]
     UnexpectedError(#[from] anyhow::Error),
 }
 
-impl IntoResponse for LoginFormError {
+impl IntoResponse for PasswordFormError {
     fn into_response(self) -> axum::response::Response {
         tracing::error!("{} Reason {:?}", self, self);
         match self {
