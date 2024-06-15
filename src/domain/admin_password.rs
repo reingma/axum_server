@@ -1,7 +1,7 @@
 use secrecy::Secret;
 use unicode_segmentation::UnicodeSegmentation;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Password(Secret<String>);
 
 impl TryFrom<String> for Password {

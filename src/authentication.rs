@@ -1,5 +1,8 @@
 use anyhow::Context;
-use argon2::{Argon2, PasswordHash, PasswordVerifier};
+use argon2::{
+    password_hash::SaltString, Argon2, Params, PasswordHash, PasswordHasher,
+    PasswordVerifier,
+};
 use axum::{
     extract::Request,
     http::StatusCode,
@@ -7,14 +10,18 @@ use axum::{
     response::{IntoResponse, Redirect, Response},
 };
 use secrecy::{ExposeSecret, Secret};
+use uuid::Uuid;
 
 use crate::{
     database::{
-        queries::{get_stored_credentials, ValidateUserError},
+        queries::{
+            change_password_query, get_stored_credentials, ValidateUserError,
+        },
         DatabaseConnection,
     },
     domain::Password,
     session_state::TypedSession,
+    telemetry::spawn_blocking_with_tracing,
 };
 
 #[derive(thiserror::Error, Debug)]
@@ -113,4 +120,34 @@ pub async fn check_credentials(
     } else {
         Ok(next.run(request).await)
     }
+}
+
+#[tracing::instrument(name = "Change password", skip(password, connection))]
+pub async fn change_password(
+    user_id: Uuid,
+    password: Password,
+    connection: &mut DatabaseConnection,
+) -> Result<(), anyhow::Error> {
+    let password_hash =
+        spawn_blocking_with_tracing(move || compute_password_hash(&password))
+            .await?
+            .context("Failed to hash password.")?;
+    change_password_query(connection, user_id, password_hash)
+        .await
+        .context("Failed to change password in the database.")?;
+    Ok(())
+}
+
+fn compute_password_hash(
+    password: &Password,
+) -> Result<Secret<String>, anyhow::Error> {
+    let salt = SaltString::generate(&mut rand::thread_rng());
+    let password_hash = Argon2::new(
+        argon2::Algorithm::Argon2id,
+        argon2::Version::V0x13,
+        Params::new(15000, 2, 1, None).unwrap(),
+    )
+    .hash_password(password.as_ref().expose_secret().as_bytes(), &salt)?
+    .to_string();
+    Ok(Secret::new(password_hash))
 }

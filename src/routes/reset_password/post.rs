@@ -35,16 +35,18 @@ pub async fn change_pasword(
         crate::database::get_connection(app_state.database_pool)
             .await
             .context("Failed to get database pool")?;
-    match Password::try_from(form.new_password.expose_secret().to_string()) {
-        Ok(_) => (),
-        Err(err) => {
-            return Ok(redirect_with_flash(
-                "/admin/password",
-                anyhow!(err),
-                jar,
-            ))
-        }
-    }
+    let new_pass =
+        match Password::try_from(form.new_password.expose_secret().to_string())
+        {
+            Ok(pass) => pass,
+            Err(err) => {
+                return Ok(redirect_with_flash(
+                    "/admin/password",
+                    anyhow!(err),
+                    jar,
+                ))
+            }
+        };
     if form.new_password_check.expose_secret()
         != form.new_password.expose_secret()
     {
@@ -87,7 +89,17 @@ pub async fn change_pasword(
             )),
         };
     } else {
-        todo!()
+        crate::authentication::change_password(
+            user_id,
+            new_pass,
+            &mut connection,
+        )
+        .await?;
+        Ok(redirect_with_flash(
+            "/admin/password",
+            anyhow!("Your password has been changed."),
+            jar,
+        ))
     }
 }
 

@@ -8,7 +8,7 @@ use tracing::instrument;
 
 use crate::{session_state::TypedSession, utils::redirect_with_flash};
 
-#[instrument(skip(jar, session))]
+#[instrument(name = "logout requested", skip(jar, session))]
 pub async fn logout(
     jar: SignedCookieJar,
     session: TypedSession,

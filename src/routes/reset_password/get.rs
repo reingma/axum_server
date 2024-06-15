@@ -9,7 +9,7 @@ use tracing::instrument;
 
 use crate::{utils::get_flash_error, TEMPLATES};
 
-#[instrument(name = "Requesting reset_password page")]
+#[instrument(name = "Requesting reset_password page", skip(jar))]
 pub async fn reset_password_form(
     jar: SignedCookieJar,
 ) -> Result<(SignedCookieJar, Response<Body>), PasswordFormError> {
