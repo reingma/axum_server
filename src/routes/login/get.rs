@@ -9,7 +9,7 @@ use tracing::instrument;
 
 use crate::{utils::get_flash_error, TEMPLATES};
 
-#[instrument(name = "Requesting login page")]
+#[instrument(name = "Requesting login page", skip(jar))]
 pub async fn login_form(
     jar: SignedCookieJar,
 ) -> Result<(SignedCookieJar, Response<Body>), LoginFormError> {
