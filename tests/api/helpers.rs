@@ -72,10 +72,6 @@ impl TestUser {
             .await
             .expect("Failed to add user");
     }
-
-    pub fn get_credentials(&self) -> (&str, &str) {
-        (&self.username, &self.password)
-    }
 }
 
 pub struct ConfirmationLinks {
@@ -142,14 +138,31 @@ impl TestApp {
         &self,
         body: serde_json::Value,
     ) -> reqwest::Response {
-        let (uname, pword) = self.test_user.get_credentials();
         self.request_client
-            .post(&format!("{}/newsletters", &self.address))
-            .basic_auth(uname, Some(pword))
-            .json(&body)
+            .post(&format!("{}/admin/newsletters", &self.address))
+            .form(&body)
             .send()
             .await
             .expect("Request failed.")
+    }
+
+    pub async fn get_newsletter_html(&self) -> String {
+        self.request_client
+            .get(&format!("{}/admin/newsletters", &self.address))
+            .send()
+            .await
+            .expect("Failed to send request")
+            .text()
+            .await
+            .unwrap()
+    }
+
+    pub async fn get_newsletter(&self) -> reqwest::Response {
+        self.request_client
+            .get(&format!("{}/admin/newsletters", &self.address))
+            .send()
+            .await
+            .expect("Failed to send request")
     }
 
     pub async fn post_login<Body>(&self, body: &Body) -> reqwest::Response
@@ -229,6 +242,14 @@ impl TestApp {
             .send()
             .await
             .expect("Failed to send request")
+    }
+
+    pub async fn login_test_user(&self) {
+        let login_body = serde_json::json!({
+            "username": &self.test_user.username,
+            "password":&self.test_user.password
+        });
+        self.post_login(&login_body).await;
     }
 }
 pub async fn spawn_app(migration: Option<EmbeddedMigrations>) -> TestApp {

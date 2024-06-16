@@ -3,17 +3,16 @@ use axum::{
     extract::State,
     http::{Response, StatusCode},
     response::{IntoResponse, Redirect},
-    Form,
+    Extension, Form,
 };
 use axum_extra::extract::SignedCookieJar;
 use secrecy::{ExposeSecret, Secret};
 use tracing::instrument;
 
 use crate::{
-    authentication::{validate_credentials, AuthError, Credentials},
+    authentication::{validate_credentials, AuthError, Credentials, UserId},
     database::queries::get_username,
     domain::Password,
-    session_state::TypedSession,
     startup::ApplicationState,
     utils::redirect_with_flash,
 };
@@ -24,11 +23,11 @@ pub struct FormData {
     new_password: Secret<String>,
     new_password_check: Secret<String>,
 }
-#[instrument(skip(app_state, session, form, jar))]
+#[instrument(skip(app_state, form, jar))]
 pub async fn change_pasword(
     State(app_state): State<ApplicationState>,
     jar: SignedCookieJar,
-    session: TypedSession,
+    Extension(user_id): Extension<UserId>,
     Form(form): Form<FormData>,
 ) -> Result<(SignedCookieJar, Redirect), PasswordResetError> {
     let mut connection =
@@ -59,9 +58,7 @@ pub async fn change_pasword(
             jar,
         ));
     }
-    //must exist since the middleware would redirect on failure.
-    let user_id = session.get_user_id().await.unwrap().unwrap();
-    let username = get_username(&mut connection, user_id)
+    let username = get_username(&mut connection, *user_id)
         .await
         .context("Failed to get user information.")?;
     let password = match Password::try_from(
@@ -90,7 +87,7 @@ pub async fn change_pasword(
         };
     } else {
         crate::authentication::change_password(
-            user_id,
+            *user_id,
             new_pass,
             &mut connection,
         )

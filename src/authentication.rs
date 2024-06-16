@@ -1,17 +1,3 @@
-use anyhow::Context;
-use argon2::{
-    password_hash::SaltString, Argon2, Params, PasswordHash, PasswordHasher,
-    PasswordVerifier,
-};
-use axum::{
-    extract::Request,
-    http::StatusCode,
-    middleware::Next,
-    response::{IntoResponse, Redirect, Response},
-};
-use secrecy::{ExposeSecret, Secret};
-use uuid::Uuid;
-
 use crate::{
     database::{
         queries::{
@@ -20,9 +6,18 @@ use crate::{
         DatabaseConnection,
     },
     domain::Password,
-    session_state::TypedSession,
     telemetry::spawn_blocking_with_tracing,
 };
+use anyhow::Context;
+use argon2::{
+    password_hash::SaltString, Argon2, Params, PasswordHash, PasswordHasher,
+    PasswordVerifier,
+};
+use secrecy::{ExposeSecret, Secret};
+use uuid::Uuid;
+
+mod middleware;
+pub use middleware::*;
 
 #[derive(thiserror::Error, Debug)]
 pub enum AuthError {
@@ -96,30 +91,6 @@ fn verify_password_hash(
         .context("Invalid password.")
         .map_err(AuthError::InvalidCredentials)?;
     Ok(())
-}
-
-#[tracing::instrument(
-    name = "Middleware Credential Checking",
-    skip(session, request, next)
-)]
-pub async fn check_credentials(
-    session: TypedSession,
-    request: Request,
-    next: Next,
-) -> Result<impl IntoResponse, Response> {
-    if session
-        .get_user_id()
-        .await
-        .context("Could not confirm user login")
-        .map_err(|err| {
-            (StatusCode::UNAUTHORIZED, err.to_string()).into_response()
-        })?
-        .is_none()
-    {
-        Ok(Redirect::to("/login").into_response())
-    } else {
-        Ok(next.run(request).await)
-    }
 }
 
 #[tracing::instrument(name = "Change password", skip(password, connection))]

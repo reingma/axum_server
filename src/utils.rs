@@ -2,6 +2,7 @@ use axum::response::Redirect;
 use axum_extra::extract::SignedCookieJar;
 use cookie::Cookie;
 
+//TODO: fix this so we dont have errors, just make it pure message passage here
 pub fn redirect_with_flash(
     uri: &str,
     e: anyhow::Error,

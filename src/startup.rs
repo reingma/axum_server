@@ -53,16 +53,16 @@ pub async fn run(
         ).on_response(|response: &Response, _latency: Duration, span: &Span|{
                 span.record("response_code", response.status().as_str());
             });
-    /*let auth_layer = ServiceBuilder::new()
-    .layer(HandleErrorLayer::new(|_: BoxError| async {
-        StatusCode::UNAUTHORIZED
-    }))
-    .layer(middleware::from_fn(check_credentials));*/
     let admin_routes = Router::new()
         .route("/admin/dashboard", routing::get(routes::admin_dashboard))
         .route("/admin/password", routing::get(routes::reset_password_form))
         .route("/admin/password", routing::post(routes::change_pasword))
         .route("/admin/logout", routing::post(routes::logout))
+        .route(
+            "/admin/newsletters",
+            routing::post(routes::publish_newsletter),
+        )
+        .route("/admin/newsletters", routing::get(routes::newsletters_form))
         .layer(
             ServiceBuilder::new()
                 .layer(session_layer.clone())
@@ -76,7 +76,6 @@ pub async fn run(
         .route("/health_check", routing::get(routes::health_check))
         .route("/subscriptions", routing::post(routes::subscriptions))
         .route("/subscriptions/confirm", routing::get(routes::confirm))
-        .route("/newsletters", routing::post(routes::publish_newsletter))
         .route("/login", routing::get(routes::login_form))
         .route("/login", routing::post(routes::login))
         .layer(session_layer)
