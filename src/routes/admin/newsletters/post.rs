@@ -4,12 +4,17 @@ use crate::{
 };
 use anyhow::{anyhow, Context};
 use axum::{
-    extract::State,
+    async_trait,
+    extract::{
+        rejection::FormRejection, FromRef, FromRequest, FromRequestParts,
+        Request, State,
+    },
     http::{Response, StatusCode},
     response::{IntoResponse, Redirect},
-    Extension, Form,
+    Extension,
 };
 use axum_extra::extract::SignedCookieJar;
+use cookie::Key;
 
 #[derive(serde::Deserialize)]
 pub struct NewsletterForm {
@@ -83,6 +88,7 @@ pub enum PublishNewsletterError {
 
 impl IntoResponse for PublishNewsletterError {
     fn into_response(self) -> axum::response::Response {
+        //TODO: there has to be a better way to handle errors.
         tracing::error!("{} Reason {:?}", self, self);
         match self {
             PublishNewsletterError::UnexpectedError(_) => Response::builder()
@@ -97,6 +103,38 @@ impl IntoResponse for PublishNewsletterError {
                 )
                 .body("Unauthorized Access".into())
                 .unwrap(),
+        }
+    }
+}
+
+pub struct Form<T>(pub T);
+
+#[async_trait]
+impl<S, T> FromRequest<S> for Form<T>
+where
+    axum::Form<T>: FromRequest<S, Rejection = FormRejection>,
+    S: Send + Sync,
+    Key: FromRef<S>,
+{
+    type Rejection = (SignedCookieJar, Redirect);
+
+    async fn from_request(
+        req: Request,
+        state: &S,
+    ) -> Result<Self, Self::Rejection> {
+        let (mut parts, body) = req.into_parts();
+        let jar = SignedCookieJar::from_request_parts(&mut parts, state)
+            .await
+            .expect("Failed to extract the cookie jar.");
+        let req = Request::from_parts(parts, body);
+
+        match axum::Form::<T>::from_request(req, state).await {
+            Ok(value) => Ok(Self(value.0)),
+            Err(_) => Err(redirect_with_flash(
+                "/admin/newsletters",
+                anyhow!("Invalid newsletter body."),
+                jar,
+            )),
         }
     }
 }
