@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8">
+		<meta http-equiv="content-type" content="text/html">
+		<title>Newsletter delivery</title>
+	</head>
+	<body>
+		<p><i>{{message}}</i></p>
+		<form action="/admin/newsletters" method="post">
+			<label for="title">Title
+				<input type="text" name="title" placeholder="Enter title of newsletter">
+			</label>
+			<label for="text_content">Text content
+				<input type="text" name="text_content" placeholder="Enter text content of newsletter">
+			</label>
+			<label for="html_content">Html content
+				<input type="text" name="html_content" placeholder="Enter html content of newsletter">
+			</label>
+			<button type="submit">Post newsletter</button>
+		</form>
+	
+	</body>
+</html>
