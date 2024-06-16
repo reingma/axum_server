@@ -3,6 +3,8 @@ use axum_extra::extract::SignedCookieJar;
 use cookie::Cookie;
 
 //TODO: fix this so we dont have errors, just make it pure message passage here
+//NOTE: Idea: try to create a middleware that stores a string as a message and feeds into the
+//request.
 pub fn redirect_with_flash(
     uri: &str,
     e: anyhow::Error,

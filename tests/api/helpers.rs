@@ -136,11 +136,11 @@ impl TestApp {
 
     pub async fn post_newsletter(
         &self,
-        body: serde_json::Value,
+        body: &serde_json::Value,
     ) -> reqwest::Response {
         self.request_client
             .post(&format!("{}/admin/newsletters", &self.address))
-            .form(&body)
+            .form(body)
             .send()
             .await
             .expect("Request failed.")
