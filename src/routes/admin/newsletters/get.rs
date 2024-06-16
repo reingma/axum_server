@@ -9,7 +9,7 @@ use tracing::instrument;
 
 use crate::{utils::get_flash_error, TEMPLATES};
 
-#[instrument(name = "Requesting newsletters page")]
+#[instrument(name = "Requesting newsletters page", skip(jar))]
 pub async fn newsletters_form(
     jar: SignedCookieJar,
 ) -> Result<(SignedCookieJar, Response<Body>), NewsletterFormError> {
