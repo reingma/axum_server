@@ -16,6 +16,7 @@ pub async fn newsletters_form(
     let mut tera_context = tera::Context::new();
     let (jar, message) = get_flash_error(jar);
     tera_context.insert("message", &message);
+    tera_context.insert("idempotency_key", &uuid::Uuid::now_v7());
     let html_body = TEMPLATES
         .render("pages/newsletters.html", &tera_context)
         .context("Could not render login page.")?;

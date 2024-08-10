@@ -1,6 +1,7 @@
 use crate::{
     authentication::UserId, database::queries::get_confirmed_subscribers,
-    startup::ApplicationState, utils::redirect_with_flash,
+    idempotency::IdempotencyKey, startup::ApplicationState,
+    utils::redirect_with_flash,
 };
 use anyhow::{anyhow, Context};
 use axum::{
@@ -21,6 +22,7 @@ pub struct NewsletterForm {
     title: String,
     content_text: String,
     content_html: String,
+    idempotency_key: String,
 }
 #[tracing::instrument(
     name = "Publish a newsletter issue",
@@ -33,6 +35,15 @@ pub async fn publish_newsletter(
     Extension(valid_id): Extension<UserId>,
     Form(form): Form<NewsletterForm>,
 ) -> Result<(SignedCookieJar, Redirect), PublishNewsletterError> {
+    let NewsletterForm {
+        title,
+        content_text,
+        content_html,
+        idempotency_key,
+    } = form;
+    let idempotency_key: IdempotencyKey = idempotency_key
+        .try_into()
+        .context("Failed to parse idempotency key")?;
     let mut connection =
         crate::database::get_connection(app_state.database_pool)
             .await
@@ -49,9 +60,9 @@ pub async fn publish_newsletter(
                 email_client
                     .send_email(
                         &valid_subscriber.confirmed_email,
-                        &form.content_text,
-                        &form.content_html,
-                        &form.title,
+                        &content_text,
+                        &content_html,
+                        &title,
                     )
                     .await
                     .with_context(|| {

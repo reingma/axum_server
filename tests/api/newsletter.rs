@@ -53,7 +53,8 @@ async fn newsletter_are_not_delivered_to_uncofirmed_subscribers() {
     let newsletter_request_body = serde_json::json!({
         "title":"Newsletter title",
         "content_text": "Newsletter body as plaintext",
-        "content_html":"<p>Newsletter body as HTML</p>"
+        "content_html":"<p>Newsletter body as HTML</p>",
+        "idempotency_key": uuid::Uuid::now_v7().to_string()
     });
     let response = app.post_newsletter(&(newsletter_request_body)).await;
     assert_is_redirect_to(&response, "/admin/newsletters");
@@ -81,7 +82,8 @@ async fn newsletter_are_delivered_to_confirmed_subscribers() {
     let newsletter_request_body = serde_json::json!({
         "title":"Newsletter title",
         "content_text": "Newsletter body as plaintext",
-        "content_html":"<p>Newsletter body as HTML</p>"
+        "content_html":"<p>Newsletter body as HTML</p>",
+        "idempotency_key": uuid::Uuid::now_v7().to_string()
     });
     let response = app.post_newsletter(&(newsletter_request_body)).await;
 
@@ -108,7 +110,8 @@ async fn redirect_with_message_on_invalid_data_email_not_delivered() {
 
     let newsletter_request_body = serde_json::json!({
         "title":"Newsletter title",
-        "content_html":"<p>Newsletter body as HTML</p>"
+        "content_html":"<p>Newsletter body as HTML</p>",
+        "idempotency_key": uuid::Uuid::now_v7().to_string()
     });
     let response = app.post_newsletter(&newsletter_request_body).await;
 
@@ -127,7 +130,8 @@ async fn newsletter_succeds_with_message_on_valid_data() {
     let body = serde_json::json!({
         "title":"Newsletter title",
         "content_text": "Newsletter body as plaintext",
-        "content_html":"<p>Newsletter body as HTML</p>"
+        "content_html":"<p>Newsletter body as HTML</p>",
+        "idempotency_key": uuid::Uuid::now_v7().to_string()
     });
     let response = app.post_newsletter(&body).await;
 
@@ -145,7 +149,8 @@ async fn you_must_be_logged_in_to_post_newsletter() {
     let body = serde_json::json!({
         "title":"Newsletter title",
         "content_text": "Newsletter body as plaintext",
-        "content_html":"<p>Newsletter body as HTML</p>"
+        "content_html":"<p>Newsletter body as HTML</p>",
+        "idempotency_key": uuid::Uuid::now_v7().to_string()
     });
     let response = app.post_newsletter(&body).await;
     assert_is_redirect_to(&response, "/login");
