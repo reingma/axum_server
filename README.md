@@ -6,6 +6,7 @@ Based on the book https://www.zero2prod.com. With the following changes:
   - Using the async version of diesel
   - Using tera for html rendering
   - Using tower middleware layer and tracing
+  - Added a nix flake for starting up whole enviroment using direnv
 Besides some natural code structuring changes 
 Credentials for first login:
 username: admin
