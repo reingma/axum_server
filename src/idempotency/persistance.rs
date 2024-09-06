@@ -3,6 +3,7 @@ use crate::models::{HeaderPair, Idempotency};
 
 use super::IdempotencyKey;
 use crate::schema::idempotency::dsl::*;
+use axum::body;
 use axum::http::{Response, StatusCode};
 use diesel::prelude::*;
 use diesel::SelectableHelper;
@@ -13,13 +14,9 @@ pub async fn get_saved_response(
     connection: &mut DatabaseConnection,
     key: IdempotencyKey,
     id: Uuid,
-) -> Result<Option<Response<Vec<u8>>>, anyhow::Error> {
+) -> Result<Option<Response<body::Body>>, anyhow::Error> {
     let key: String = String::from(key);
     let saved_response: Option<Idempotency> = idempotency
-        // .filter(diesel::BoolExpressionMethods::and(
-        //     idempotency_key.eq(key.into()),
-        //     user_id.eq(id),
-        // ))
         .filter(idempotency_key.eq(key).and(user_id.eq(id)))
         .select(Idempotency::as_select())
         .first(connection)
@@ -32,9 +29,19 @@ pub async fn get_saved_response(
         for HeaderPair { name, value } in r.request.response_headers {
             response = response.header(name, value);
         }
-        let response = response.body(r.request.response_body)?;
+        let response: Response<body::Body> =
+            response.body(body::Body::from(r.request.response_body))?;
         Ok(Some(response))
     } else {
         Ok(None)
     }
+}
+
+pub async fn save_response(
+    connection: &mut DatabaseConnection,
+    key: IdempotencyKey,
+    id: Uuid,
+    response: Response<body::Body>,
+) -> Result<(), anyhow::Error> {
+    todo!()
 }

@@ -1,11 +1,14 @@
 use crate::{
-    authentication::UserId, database::queries::get_confirmed_subscribers,
-    idempotency::IdempotencyKey, startup::ApplicationState,
+    authentication::UserId,
+    database::queries::get_confirmed_subscribers,
+    idempotency::{get_saved_response, IdempotencyKey},
+    startup::ApplicationState,
     utils::redirect_with_flash,
 };
 use anyhow::{anyhow, Context};
 use axum::{
     async_trait,
+    body::Body,
     extract::{
         rejection::FormRejection, FromRef, FromRequest, FromRequestParts,
         Request, State,
@@ -15,7 +18,11 @@ use axum::{
     Extension,
 };
 use axum_extra::extract::SignedCookieJar;
-use cookie::Key;
+use cookie::{Cookie, Key};
+pub enum PublishNewsletterResponses {
+    SavedResponse(Response<Body>),
+    Redirect(Redirect),
+}
 
 #[derive(serde::Deserialize)]
 pub struct NewsletterForm {
@@ -34,7 +41,8 @@ pub async fn publish_newsletter(
     jar: SignedCookieJar,
     Extension(valid_id): Extension<UserId>,
     Form(form): Form<NewsletterForm>,
-) -> Result<(SignedCookieJar, Redirect), PublishNewsletterError> {
+) -> Result<(SignedCookieJar, PublishNewsletterResponses), PublishNewsletterError>
+{
     let NewsletterForm {
         title,
         content_text,
@@ -48,6 +56,21 @@ pub async fn publish_newsletter(
         crate::database::get_connection(app_state.database_pool)
             .await
             .context("Could not get database pool")?;
+    if let Some(saved_response) =
+        get_saved_response(&mut connection, idempotency_key, *valid_id)
+            .await
+            .context("Failed to retrieve saved responses")?
+    {
+        let cookie =
+            Cookie::build(("_flash", "The newsletter has been published"))
+                .path("/")
+                .secure(true);
+        let jar = jar.add(cookie);
+        return Ok((
+            jar,
+            PublishNewsletterResponses::SavedResponse(saved_response),
+        ));
+    }
     tracing::Span::current()
         .record("user_id", &tracing::field::display(&valid_id));
     let subscribers = get_confirmed_subscribers(&mut connection)
@@ -82,11 +105,12 @@ pub async fn publish_newsletter(
         }
     }
     tracing::info!("Email delivered to subscribers.");
-    Ok(redirect_with_flash(
+    let (new_jar, redirect) = redirect_with_flash(
         "/admin/newsletters",
         anyhow!("Newsletter delivered successfully"),
         jar,
-    ))
+    );
+    Ok((new_jar, PublishNewsletterResponses::Redirect(redirect)))
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -114,6 +138,15 @@ impl IntoResponse for PublishNewsletterError {
                 )
                 .body("Unauthorized Access".into())
                 .unwrap(),
+        }
+    }
+}
+
+impl IntoResponse for PublishNewsletterResponses {
+    fn into_response(self) -> axum::response::Response<Body> {
+        match self {
+            PublishNewsletterResponses::SavedResponse(res) => res,
+            PublishNewsletterResponses::Redirect(res) => res.into_response(),
         }
     }
 }
