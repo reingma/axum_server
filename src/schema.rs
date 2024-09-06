@@ -4,9 +4,6 @@ pub mod sql_types {
     #[derive(diesel::query_builder::QueryId, diesel::sql_types::SqlType)]
     #[diesel(postgres_type(name = "http_request"))]
     pub struct HttpRequest;
-    #[derive(diesel::query_builder::QueryId, diesel::sql_types::SqlType)]
-    #[diesel(postgres_type(name = "header_pair"))]
-    pub struct HeaderPair;
 }
 
 diesel::table! {
