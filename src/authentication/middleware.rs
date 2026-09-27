@@ -18,22 +18,21 @@ pub async fn check_credentials(
     session: TypedSession,
     mut request: Request,
     next: Next,
-) -> Result<impl IntoResponse, Response> {
+) -> Response {
     let id = match session
         .get_user_id()
         .await
         .context("Could not confirm user login")
-        .map_err(|err| {
-            (StatusCode::UNAUTHORIZED, err.to_string()).into_response()
-        })? {
-        Some(id) => id,
-        None => {
-            return Ok(Redirect::to("/login").into_response());
+    {
+        Ok(Some(id)) => id,
+        Ok(None) => return Redirect::to("/login").into_response(),
+        Err(err) => {
+            return (StatusCode::UNAUTHORIZED, err.to_string()).into_response();
         }
     };
 
     request.extensions_mut().insert(UserId(id));
-    Ok(next.run(request).await)
+    next.run(request).await
 }
 
 #[derive(Debug, Clone, Copy)]
