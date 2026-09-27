@@ -1,8 +1,9 @@
 application:
   port: 8000
   redis_uri: "redis://127.0.0.1:6379"
-  hmac_secret: "dev-only-not-a-secret"
-database:
+  hmac_secret: "1iHnH3pMr95nKHUPH3qin1S41y3qo3tg+ZDQfEukQNrdir7UyJmAxSg0tlBHm4f7
+2IHmk80psBowovfrQsBaeA=="
+  database:
   host: "127.0.0.1"
   port: 5432
   username: "postgres"
