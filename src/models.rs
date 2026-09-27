@@ -136,12 +136,7 @@ impl FromSql<crate::schema::sql_types::HttpRequest, Pg> for HttpRequest {
             response_body,
             http_version,
         ) = FromSql::<
-            Record<(
-                SmallInt,
-                Array<sql_types::HeaderPair>,
-                Bytea,
-                Text,
-            )>,
+            Record<(SmallInt, Array<sql_types::HeaderPair>, Bytea, Text)>,
             Pg,
         >::from_sql(bytes)?;
         Ok(HttpRequest {

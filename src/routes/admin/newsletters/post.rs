@@ -59,7 +59,7 @@ pub async fn publish_newsletter(
         return Ok(saved_response);
     }
     tracing::Span::current()
-        .record("user_id", &tracing::field::display(&valid_id));
+        .record("user_id", tracing::field::display(&valid_id));
     let subscribers = get_confirmed_subscribers(&mut connection)
         .await
         .context("Could not get confirmed subscribers")?;

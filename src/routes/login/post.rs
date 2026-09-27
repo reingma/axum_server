@@ -44,7 +44,7 @@ pub async fn login(
         password,
     };
     tracing::Span::current()
-        .record("username", &tracing::field::display(&credentials.username));
+        .record("username", tracing::field::display(&credentials.username));
     let mut connection =
         crate::database::get_connection(app_state.database_pool)
             .await
@@ -52,7 +52,7 @@ pub async fn login(
     match validate_credentials(credentials, &mut connection).await {
         Ok(user_id) => {
             tracing::Span::current()
-                .record("user_id", &tracing::field::display(&user_id));
+                .record("user_id", tracing::field::display(&user_id));
             session.cycle_id().await.context("Session failure")?;
             if let Err(e) = session
                 .insert_user_id(user_id)

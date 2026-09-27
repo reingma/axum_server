@@ -1,10 +1,9 @@
 name: Rust
 
-on: [push,pull_request]
+on: [push, pull_request]
 
 env:
   CARGO_TERM_COLOR: always
-  DIESEL_VERSION: 2.1.4 
 
 jobs:
   test:
@@ -19,39 +18,40 @@ jobs:
           POSTGRES_DB: postgres
         ports:
           - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
       redis:
         image: redis:7
         ports:
           - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+      - name: Install libpq-dev
+        run: sudo apt-get update && sudo apt-get install -y libpq-dev
+      - name: Add the linker
+        uses: rui314/setup-mold@v1
       - name: Install rust toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Rust cache action
         uses: Swatinem/rust-cache@v2
-        with:
-          key: diesel-${{ env.DIESEL_VERSION }}
-      - name: Install diesel_cli
-        run:
-          cargo install diesel_cli
-      - name: Install psql
-        run: sudo apt-get update && sudo apt-get install postgresql-client -y
-      - name: Install libpq-dev
-        run: sudo apt-get update && sudo apt-get install libpq-dev
-      - name: Add the linker
-        uses: rui314/setup-mold@v1
-      - name: Migrate db
-        run: SKIP_DOCKER=true ./scripts/init_db.sh
       - name: Run tests
-        run: cargo test
+        run: cargo test --locked
 
   fmt:
     name: Rustfmt
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout branch
-        uses: actions/checkout@v3
+      - name: Checkout repo
+        uses: actions/checkout@v4
       - name: Install toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -62,41 +62,21 @@ jobs:
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:14
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: password
-          POSTGRES_DB: postgres
-        ports:
-          - 5432:5432
-      redis:
-        image: redis:7
-        ports:
-          - 6379:6379
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v3
-      - name: Install rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-      - name: Rust cache action
-        uses: Swatinem/rust-cache@v2
-        with:
-          key: diesel-${{ env.DIESEL_VERSION }}
-      - name: Install diesel_cli
-        run:
-          cargo install diesel_cli
-      - name: Install psql
-        run: sudo apt-get update && sudo apt-get install postgresql-client -y
+        uses: actions/checkout@v4
       - name: Install libpq-dev
-        run: sudo apt-get update && sudo apt-get install libpq-dev
+        run: sudo apt-get update && sudo apt-get install -y libpq-dev
       - name: Add the linker
         uses: rui314/setup-mold@v1
-      - name: Migrate db
-        run: SKIP_DOCKER=true ./scripts/init_db.sh
+      - name: Install rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - name: Rust cache action
+        uses: Swatinem/rust-cache@v2
       - name: Linting
-        run: cargo clippy -- -D warnings
+        run: cargo clippy --locked --all-targets -- -D warnings
 
   coverage:
     name: Code coverage
@@ -110,32 +90,34 @@ jobs:
           POSTGRES_DB: postgres
         ports:
           - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
       redis:
         image: redis:7
         ports:
           - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+      - name: Install libpq-dev
+        run: sudo apt-get update && sudo apt-get install -y libpq-dev
+      - name: Add the linker
+        uses: rui314/setup-mold@v1
       - name: Install rust toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Rust cache action
         uses: Swatinem/rust-cache@v2
+      - name: Install cargo-tarpaulin
+        uses: taiki-e/install-action@v2
         with:
-          key: diesel-${{ env.DIESEL_VERSION }}
-      - name: Install diesel_cli
-        run:
-          cargo install diesel_cli
-      - name: Install psql
-        run: sudo apt-get update && sudo apt-get install postgresql-client -y
-      - name: Install libpq-dev
-        run: sudo apt-get update && sudo apt-get install libpq-dev
-      - name: Add the linker
-        uses: rui314/setup-mold@v1
-      - name: Migrate db
-        run: SKIP_DOCKER=true ./scripts/init_db.sh
+          tool: cargo-tarpaulin
       - name: Generate code coverage
-        uses: actions-rs/tarpaulin@v0.1
-        with:
-          version: '0.15.0'
-          args: '--verbose --workspace'
+        run: cargo tarpaulin --locked --verbose --workspace

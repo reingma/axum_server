@@ -24,7 +24,7 @@ pub fn create_connection_pool(url: &str) -> DatabaseConnectionPool {
 
 pub fn establish_connection(
     config: &str,
-) -> BoxFuture<ConnectionResult<AsyncPgConnection>> {
+) -> BoxFuture<'_, ConnectionResult<AsyncPgConnection>> {
     let future = async {
         let mut rustls_config = rustls::ClientConfig::builder()
             .with_root_certificates(root_certificates())
