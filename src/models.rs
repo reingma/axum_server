@@ -9,6 +9,15 @@ use diesel::{
 };
 use uuid::Uuid;
 
+/// SQL types that `diesel print-schema` does not generate because they are
+/// only used nested inside other composite types (e.g. `header_pair` inside
+/// `http_request`). Kept here so regenerating `schema.rs` does not drop them.
+pub mod sql_types {
+    #[derive(diesel::query_builder::QueryId, diesel::sql_types::SqlType)]
+    #[diesel(postgres_type(name = "header_pair"))]
+    pub struct HeaderPair;
+}
+
 #[derive(Insertable, Queryable, Selectable)]
 #[diesel(table_name = crate::schema::subscriptions)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
@@ -81,12 +90,12 @@ pub struct Idempotency {
 }
 
 #[derive(Debug, FromSqlRow, AsExpression, Clone)]
-#[diesel(sql_type = crate::schema::sql_types::HeaderPair)]
+#[diesel(sql_type = sql_types::HeaderPair)]
 pub struct HeaderPair {
     pub name: String,
     pub value: Vec<u8>,
 }
-impl FromSql<crate::schema::sql_types::HeaderPair, Pg> for HeaderPair {
+impl FromSql<sql_types::HeaderPair, Pg> for HeaderPair {
     fn from_sql(
         bytes: <Pg as diesel::backend::Backend>::RawValue<'_>,
     ) -> diesel::deserialize::Result<Self> {
@@ -96,7 +105,7 @@ impl FromSql<crate::schema::sql_types::HeaderPair, Pg> for HeaderPair {
         Ok(pair)
     }
 }
-impl ToSql<crate::schema::sql_types::HeaderPair, Pg> for HeaderPair {
+impl ToSql<sql_types::HeaderPair, Pg> for HeaderPair {
     fn to_sql<'b>(
         &'b self,
         out: &mut diesel::serialize::Output<'b, '_, Pg>,
@@ -129,7 +138,7 @@ impl FromSql<crate::schema::sql_types::HttpRequest, Pg> for HttpRequest {
         ) = FromSql::<
             Record<(
                 SmallInt,
-                Array<crate::schema::sql_types::HeaderPair>,
+                Array<sql_types::HeaderPair>,
                 Bytea,
                 Text,
             )>,
@@ -150,7 +159,7 @@ impl ToSql<crate::schema::sql_types::HttpRequest, Pg> for HttpRequest {
     ) -> diesel::serialize::Result {
         WriteTuple::<(
             SmallInt,
-            Array<crate::schema::sql_types::HeaderPair>,
+            Array<sql_types::HeaderPair>,
             Bytea,
             Text,
         )>::write_tuple(

@@ -4,4 +4,4 @@ pub use key::IdempotencyKey;
 
 mod persistance;
 
-pub use persistance::get_saved_response;
+pub use persistance::{get_saved_response, save_response};
