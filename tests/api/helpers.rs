@@ -94,7 +94,7 @@ impl TestApp {
         body: String,
     ) -> Result<reqwest::Response, reqwest::Error> {
         self.request_client
-            .post(format!("{}/subscriptions", &self.address))
+            .post(format!("{}/subscriptions", self.address))
             .header("Content-Type", "application/x-www-form-urlencoded")
             .body(body)
             .send()
@@ -105,7 +105,7 @@ impl TestApp {
         &self,
     ) -> Result<reqwest::Response, reqwest::Error> {
         self.request_client
-            .get(format!("{}/health_check", &self.address))
+            .get(format!("{}/health_check", self.address))
             .send()
             .await
     }
@@ -139,7 +139,7 @@ impl TestApp {
         body: &serde_json::Value,
     ) -> reqwest::Response {
         self.request_client
-            .post(format!("{}/admin/newsletters", &self.address))
+            .post(format!("{}/admin/newsletters", self.address))
             .form(body)
             .send()
             .await
@@ -148,7 +148,7 @@ impl TestApp {
 
     pub async fn get_newsletter_html(&self) -> String {
         self.request_client
-            .get(format!("{}/admin/newsletters", &self.address))
+            .get(format!("{}/admin/newsletters", self.address))
             .send()
             .await
             .expect("Failed to send request")
@@ -159,7 +159,7 @@ impl TestApp {
 
     pub async fn get_newsletter(&self) -> reqwest::Response {
         self.request_client
-            .get(format!("{}/admin/newsletters", &self.address))
+            .get(format!("{}/admin/newsletters", self.address))
             .send()
             .await
             .expect("Failed to send request")
@@ -170,7 +170,7 @@ impl TestApp {
         Body: serde::Serialize,
     {
         self.request_client
-            .post(format!("{}/login", &self.address))
+            .post(format!("{}/login", self.address))
             .form(body)
             .send()
             .await
@@ -179,7 +179,7 @@ impl TestApp {
 
     pub async fn get_login_html(&self) -> String {
         self.request_client
-            .get(format!("{}/login", &self.address))
+            .get(format!("{}/login", self.address))
             .send()
             .await
             .expect("Failed to send request")
@@ -189,14 +189,14 @@ impl TestApp {
     }
     pub async fn get_admin_dashboard(&self) -> reqwest::Response {
         self.request_client
-            .get(format!("{}/admin/dashboard", &self.address))
+            .get(format!("{}/admin/dashboard", self.address))
             .send()
             .await
             .expect("Failed to send request")
     }
     pub async fn get_admin_dashboard_html(&self) -> String {
         self.request_client
-            .get(format!("{}/admin/dashboard", &self.address))
+            .get(format!("{}/admin/dashboard", self.address))
             .send()
             .await
             .expect("Failed to send request")
@@ -206,14 +206,14 @@ impl TestApp {
     }
     pub async fn get_change_password(&self) -> reqwest::Response {
         self.request_client
-            .get(format!("{}/admin/password", &self.address))
+            .get(format!("{}/admin/password", self.address))
             .send()
             .await
             .expect("Failed to send request")
     }
     pub async fn get_change_password_html(&self) -> String {
         self.request_client
-            .get(format!("{}/admin/password", &self.address))
+            .get(format!("{}/admin/password", self.address))
             .send()
             .await
             .expect("Failed to send request")
@@ -229,7 +229,7 @@ impl TestApp {
         Body: serde::Serialize,
     {
         self.request_client
-            .post(format!("{}/admin/password", &self.address))
+            .post(format!("{}/admin/password", self.address))
             .form(body)
             .send()
             .await
@@ -238,7 +238,7 @@ impl TestApp {
 
     pub async fn post_logout(&self) -> reqwest::Response {
         self.request_client
-            .post(format!("{}/admin/logout", &self.address))
+            .post(format!("{}/admin/logout", self.address))
             .send()
             .await
             .expect("Failed to send request")

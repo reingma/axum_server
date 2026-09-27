@@ -1,9 +1,10 @@
 application:
   host: "127.0.0.1"
   base_url: "http://127.0.0.1"
+  hmac_secret: "1iHnH3pMr95nKHUPH3qin1S41y3qo3tg+ZDQfEukQNrdir7UyJmAxSg0tlBHm4f72IHmk80psBowovfrQsBaeA=="
 database:
   require_ssl: "prefer"
 email_client:
   base_url: "http://localhost"
   sender_email: "test@gmail.com"
-  api_token:  "very-secret-token"
+  api_token: "very-secret-token"

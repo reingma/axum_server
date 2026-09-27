@@ -103,6 +103,7 @@ impl<'de> Deserialize<'de> for PgSslMode {
     }
 }
 
+#[derive(PartialEq)]
 pub enum Environment {
     Development,
     Production,
